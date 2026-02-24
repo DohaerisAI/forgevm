@@ -386,20 +386,53 @@ See [SECURITY.md](SECURITY.md) for vulnerability reporting.
 ## Architecture
 
 ```
-cmd/forgevm/              CLI + server
-cmd/forgevm-agent/        Guest agent (runs inside VMs)
-internal/
-  agentproto/             Wire protocol (host <-> guest)
-  api/                    REST API + WebSocket + SSE
-  orchestrator/           Lifecycle, events, pools, templates
-  providers/              Firecracker, mock, E2B, custom
-  store/                  SQLite persistence
-sdk/
-  python/                 Python SDK
-  js/                     TypeScript SDK
-web/                      React dashboard
-tui/                      Terminal dashboard
+┌──────────────────────────────────────────────────────────────┐
+│                        Your LLM / Agent                      │
+│                   (Python SDK / TS SDK / curl)                │
+└──────────────────────┬───────────────────────────────────────┘
+                       │ HTTP / WebSocket / SSE
+                       ▼
+┌──────────────────────────────────────────────────────────────┐
+│                      ForgeVM Server                          │
+│                                                              │
+│  ┌─────────┐  ┌──────────────┐  ┌─────────┐  ┌──────────┐  │
+│  │ REST API │  │ Orchestrator │  │  Store   │  │  Events  │  │
+│  │ Chi +    │  │ Lifecycle,   │  │ SQLite   │  │  SSE     │  │
+│  │ WebSocket│  │ TTL, Pools,  │  │ WAL mode │  │  bus     │  │
+│  │ + SSE    │  │ Templates    │  │          │  │          │  │
+│  └────┬─────┘  └──────┬───────┘  └──────────┘  └──────────┘  │
+│       │               │                                      │
+│       └───────┬───────┘                                      │
+│               ▼                                              │
+│  ┌─────────────────────────────────────────────────────────┐ │
+│  │              Provider Interface                          │ │
+│  │  ┌───────────┐  ┌──────┐  ┌─────┐  ┌──────────────┐   │ │
+│  │  │Firecracker│  │ Mock │  │ E2B │  │ Custom HTTP  │   │ │
+│  │  │  (prod)   │  │(dev) │  │(cloud)│ │  (your own)  │   │ │
+│  │  └─────┬─────┘  └──────┘  └─────┘  └──────────────┘   │ │
+│  └────────┼────────────────────────────────────────────────┘ │
+└───────────┼──────────────────────────────────────────────────┘
+            │ vsock (virtio)
+            ▼
+┌──────────────────────────────────────────────────────────────┐
+│                   Firecracker microVM                        │
+│                                                              │
+│  ┌──────────────────────────────────────────────────────┐   │
+│  │                  forgevm-agent (PID 1)                │   │
+│  │                                                       │   │
+│  │  • Exec commands (/bin/sh -c "...")                   │   │
+│  │  • Read/write files                                   │   │
+│  │  • Stream stdout/stderr                               │   │
+│  │  • Length-prefixed JSON protocol over vsock            │   │
+│  └──────────────────────────────────────────────────────┘   │
+│                                                              │
+│  Dedicated kernel · Ephemeral rootfs · KVM isolated          │
+└──────────────────────────────────────────────────────────────┘
 ```
+
+**Key flow:** SDK → REST API → Orchestrator → Provider → Firecracker → vsock → Guest Agent → execute → response back
+
+**Snapshot/restore:** First spawn cold-boots (~1s) and snapshots. Every spawn after restores in ~28ms.
 
 ---
 
