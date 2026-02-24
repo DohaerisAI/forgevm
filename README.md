@@ -367,23 +367,6 @@ make web          # build frontend
 
 ---
 
-## How it Compares
-
-| | **ForgeVM** | E2B | Daytona | microsandbox |
-|---|---|---|---|---|
-| **Self-hosted** | Single binary | Terraform | Yes | Yes |
-| **Isolation** | Firecracker KVM | Firecracker KVM | Docker | libkrun |
-| **Dependencies** | Just Go | Cloud infra | Docker + k8s | Rust toolchain |
-| **Spawn speed** | ~28ms (snapshot) | ~150ms | ~27ms | Unknown |
-| **SDKs** | Python, TypeScript | Python, JS/TS | Multiple | Python, JS/TS |
-| **Web dashboard** | Built-in | No | No | No |
-| **TUI** | Built-in | No | No | No |
-| **Templates + Pools** | Built-in | Paid | Config | No |
-| **License** | MIT | Apache-2.0 | Apache-2.0 | Apache-2.0 |
-| **Cloud required** | Never | Optional | Optional | Never |
-
----
-
 ## Security
 
 - **KVM isolation** -- each sandbox = its own kernel, rootfs, network
