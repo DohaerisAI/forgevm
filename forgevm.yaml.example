@@ -1,0 +1,61 @@
+server:
+  host: "0.0.0.0"
+  port: 7423
+
+providers:
+  # Which provider to use when none is specified in the spawn request.
+  default: "mock"
+
+  # Mock provider — uses temp directories and os/exec on the host.
+  # Great for local development and testing without real VMs.
+  mock:
+    enabled: true
+
+  # Firecracker provider — manages real Firecracker microVMs directly.
+  # Requires the firecracker binary, a vmlinux kernel, and a rootfs image.
+  # See scripts/setup-kernel.sh and scripts/build-rootfs.sh to set up.
+  firecracker:
+    enabled: false
+    firecracker_path: "/usr/local/bin/firecracker"
+    kernel_path: "/var/lib/hatchit/vmlinux.bin"
+    default_rootfs: ""           # path to pre-built rootfs.ext4
+    agent_path: "./bin/hatchit-agent"
+    data_dir: "/var/lib/hatchit"
+
+  # E2B provider — forwards sandbox operations to the E2B cloud API.
+  # Requires an E2B account and API key (https://e2b.dev).
+  e2b:
+    enabled: false
+    api_key: ""
+    base_url: "https://api.e2b.dev"
+
+  # Custom HTTP provider — forwards all provider calls to a
+  # user-specified HTTP endpoint.  Use this to bring your own sandbox
+  # backend.  The remote server must implement the Hatchit provider
+  # HTTP protocol (see docs for endpoint specifications).
+  custom:
+    enabled: false
+    name: "custom"             # provider name used in spawn requests
+    base_url: ""               # e.g. "http://my-backend:8080"
+    api_key: ""                # sent as X-API-Key header
+    timeout: "60s"             # HTTP request timeout
+
+defaults:
+  ttl: "30m"
+  image: "alpine:latest"
+  memory_mb: 512
+  vcpus: 1
+  disk_size_mb: 1024
+  pool_size: 0
+  pool_template: ""
+
+auth:
+  enabled: false
+  api_key: ""
+
+database:
+  path: "hatchit.db"
+
+logging:
+  level: "info"
+  format: "json"

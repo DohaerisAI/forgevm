@@ -1,0 +1,62 @@
+# Go binaries
+*.exe
+*.dll
+*.so
+*.dylib
+*.test
+*.out
+/forgevm
+/forgevm-agent
+/bin/
+vendor/
+
+# Database
+*.db
+*.db-journal
+*.db-wal
+*.db-shm
+
+# Config (local overrides — may contain secrets)
+forgevm.yaml
+
+# IDE
+.idea/
+.vscode/
+*.swp
+*.swo
+*~
+
+# OS
+.DS_Store
+Thumbs.db
+*:Zone.Identifier
+
+# Python
+__pycache__/
+*.py[cod]
+*$py.class
+*.egg-info/
+dist/
+build/
+.eggs/
+*.egg
+.venv/
+venv/
+.pytest_cache/
+
+# Node
+node_modules/
+web/dist/
+
+# Environment
+.env
+.env.local
+
+# Coverage
+coverage/
+*.cover
+*.coverage
+htmlcov/
+
+# Claude Code
+.claude/

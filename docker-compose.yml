@@ -1,0 +1,14 @@
+services:
+  forgevm:
+    build: .
+    ports:
+      - "7423:7423"
+    volumes:
+      - forgevm-data:/data
+    environment:
+      - FORGEVM_DATABASE_PATH=/data/forgevm.db
+      - FORGEVM_LOGGING_LEVEL=info
+      - FORGEVM_LOGGING_FORMAT=pretty
+
+volumes:
+  forgevm-data:
