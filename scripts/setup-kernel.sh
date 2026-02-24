@@ -3,12 +3,11 @@
 # Usage: ./scripts/setup-kernel.sh [output-dir]
 set -euo pipefail
 
-KERNEL_VERSION="5.10.225"
-KERNEL_URL="https://s3.amazonaws.com/spec.ccfc.min/img/quickstart_guide/x86_64/kernels/vmlinux-${KERNEL_VERSION}"
+KERNEL_URL="https://s3.amazonaws.com/spec.ccfc.min/img/quickstart_guide/x86_64/kernels/vmlinux.bin"
 OUTPUT_DIR="${1:-/var/lib/forgevm}"
 OUTPUT_FILE="${OUTPUT_DIR}/vmlinux.bin"
 
-echo "==> Setting up Firecracker kernel ${KERNEL_VERSION}"
+echo "==> Setting up Firecracker kernel"
 echo "    Output: ${OUTPUT_FILE}"
 
 mkdir -p "${OUTPUT_DIR}"

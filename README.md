@@ -52,34 +52,37 @@ One binary. One command. Your hardware. Your data.
 
 ## Install
 
-### Option 1: Build from source
+### One-command setup (recommended)
 
 ```bash
 git clone https://github.com/mainadwitiya/forgevm
 cd forgevm
-
-# Build the server + guest agent
-make build-all
-
-# Verify
-./forgevm version
+./scripts/setup.sh
 ```
 
-This produces two binaries:
-- `./forgevm` -- the server/CLI
-- `./bin/forgevm-agent` -- the guest agent (injected into sandbox rootfs)
+This single script checks and installs everything:
+- Go 1.25+ (checks only -- install manually if missing)
+- Docker (checks it's running)
+- KVM permissions (`/dev/kvm`)
+- Firecracker binary (auto-downloads if missing)
+- Data directory (`/var/lib/forgevm`)
+- Kernel binary (downloads prebuilt vmlinux)
+- Builds both `forgevm` and `forgevm-agent`
 
-### Setup data directory
+Once done, just run `./forgevm serve`.
 
-ForgeVM caches rootfs images and snapshots in `/var/lib/forgevm`. Create it once:
+### Manual build (if you prefer)
 
 ```bash
+git clone https://github.com/mainadwitiya/forgevm
+cd forgevm
+make build-all                    # builds ./forgevm + ./bin/forgevm-agent
 sudo mkdir -p /var/lib/forgevm && sudo chown $(whoami) /var/lib/forgevm
+./scripts/setup-kernel.sh         # downloads kernel to /var/lib/forgevm/vmlinux.bin
+sudo chmod 666 /dev/kvm           # KVM access (or: sudo usermod -aG kvm $USER)
 ```
 
-> Or set a custom path in `forgevm.yaml` with `providers.firecracker.data_dir: "./data"`
-
-### Option 2: Docker
+### Docker
 
 ```bash
 docker build -t forgevm .
