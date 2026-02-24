@@ -69,6 +69,16 @@ This produces two binaries:
 - `./forgevm` -- the server/CLI
 - `./bin/forgevm-agent` -- the guest agent (injected into sandbox rootfs)
 
+### Setup data directory
+
+ForgeVM caches rootfs images and snapshots in `/var/lib/forgevm`. Create it once:
+
+```bash
+sudo mkdir -p /var/lib/forgevm && sudo chown $(whoami) /var/lib/forgevm
+```
+
+> Or set a custom path in `forgevm.yaml` with `providers.firecracker.data_dir: "./data"`
+
 ### Option 2: Docker
 
 ```bash
