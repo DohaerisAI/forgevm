@@ -4,7 +4,7 @@ import (
 	"fmt"
 
 	tea "github.com/charmbracelet/bubbletea"
-	"github.com/mainadwitiya/forgevm/tui"
+	"github.com/DohaerisAI/forgevm/tui"
 	"github.com/spf13/cobra"
 )
 

@@ -9,9 +9,9 @@ import (
 
 	"github.com/go-chi/chi/v5"
 	"github.com/google/uuid"
-	"github.com/mainadwitiya/forgevm/internal/httputil"
-	"github.com/mainadwitiya/forgevm/internal/orchestrator"
-	"github.com/mainadwitiya/forgevm/internal/providers"
+	"github.com/DohaerisAI/forgevm/internal/httputil"
+	"github.com/DohaerisAI/forgevm/internal/orchestrator"
+	"github.com/DohaerisAI/forgevm/internal/providers"
 )
 
 type SystemRoutes struct {

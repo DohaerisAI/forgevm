@@ -5,8 +5,8 @@ import (
 	"net/http"
 
 	"github.com/go-chi/chi/v5"
-	"github.com/mainadwitiya/forgevm/internal/httputil"
-	"github.com/mainadwitiya/forgevm/internal/providers"
+	"github.com/DohaerisAI/forgevm/internal/httputil"
+	"github.com/DohaerisAI/forgevm/internal/providers"
 )
 
 type sandboxCounter interface {

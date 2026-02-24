@@ -1,6 +1,6 @@
 # ForgeVM Python SDK
 
-Python client for [ForgeVM](https://github.com/mainadwitiya/forgevm) -- self-hosted compute sandboxes for LLMs.
+Python client for [ForgeVM](https://github.com/DohaerisAI/forgevm) -- self-hosted compute sandboxes for LLMs.
 
 ## Install
 

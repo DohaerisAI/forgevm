@@ -7,11 +7,11 @@ import (
 	"syscall"
 	"time"
 
-	"github.com/mainadwitiya/forgevm/internal/api"
-	"github.com/mainadwitiya/forgevm/internal/config"
-	"github.com/mainadwitiya/forgevm/internal/orchestrator"
-	"github.com/mainadwitiya/forgevm/internal/providers"
-	"github.com/mainadwitiya/forgevm/internal/store"
+	"github.com/DohaerisAI/forgevm/internal/api"
+	"github.com/DohaerisAI/forgevm/internal/config"
+	"github.com/DohaerisAI/forgevm/internal/orchestrator"
+	"github.com/DohaerisAI/forgevm/internal/providers"
+	"github.com/DohaerisAI/forgevm/internal/store"
 	"github.com/rs/zerolog"
 	"github.com/spf13/cobra"
 )

@@ -5,7 +5,7 @@ Thanks for your interest in contributing! ForgeVM is intentionally simple — no
 ## Getting Started
 
 ```bash
-git clone https://github.com/mainadwitiya/forgevm
+git clone https://github.com/DohaerisAI/forgevm
 cd forgevm
 make test        # run all tests
 make build       # build binaries

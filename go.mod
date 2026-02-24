@@ -1,4 +1,4 @@
-module github.com/mainadwitiya/forgevm
+module github.com/DohaerisAI/forgevm
 
 go 1.25.5
 

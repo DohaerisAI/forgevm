@@ -7,14 +7,14 @@ import (
 
 	"github.com/go-chi/chi/v5"
 	chimw "github.com/go-chi/chi/v5/middleware"
-	"github.com/mainadwitiya/forgevm/internal/api/middleware"
-	"github.com/mainadwitiya/forgevm/internal/api/routes"
-	"github.com/mainadwitiya/forgevm/internal/orchestrator"
-	"github.com/mainadwitiya/forgevm/internal/providers"
+	"github.com/DohaerisAI/forgevm/internal/api/middleware"
+	"github.com/DohaerisAI/forgevm/internal/api/routes"
+	"github.com/DohaerisAI/forgevm/internal/orchestrator"
+	"github.com/DohaerisAI/forgevm/internal/providers"
 	"github.com/rs/zerolog"
 	httpSwagger "github.com/swaggo/http-swagger/v2"
 
-	_ "github.com/mainadwitiya/forgevm/docs"
+	_ "github.com/DohaerisAI/forgevm/docs"
 )
 
 type ServerConfig struct {

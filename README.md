@@ -57,7 +57,7 @@ One binary. One command. Your hardware. Your data.
 ### One-command setup (recommended)
 
 ```bash
-git clone https://github.com/mainadwitiya/forgevm
+git clone https://github.com/DohaerisAI/forgevm
 cd forgevm
 ./scripts/setup.sh
 ```
@@ -76,7 +76,7 @@ Once done, just run `./forgevm serve`.
 ### Manual build (if you prefer)
 
 ```bash
-git clone https://github.com/mainadwitiya/forgevm
+git clone https://github.com/DohaerisAI/forgevm
 cd forgevm
 make build-all                    # builds ./forgevm + ./bin/forgevm-agent
 sudo mkdir -p /var/lib/forgevm && sudo chown $(whoami) /var/lib/forgevm
@@ -94,7 +94,7 @@ docker run -p 7423:7423 forgevm
 ### Option 3: Download binary (when releases are available)
 
 ```bash
-curl -fsSL https://github.com/mainadwitiya/forgevm/releases/latest/download/forgevm-linux-amd64 -o forgevm
+curl -fsSL https://github.com/DohaerisAI/forgevm/releases/latest/download/forgevm-linux-amd64 -o forgevm
 chmod +x forgevm
 sudo mv forgevm /usr/local/bin/
 ```

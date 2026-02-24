@@ -17,7 +17,7 @@ import (
 	"sync/atomic"
 	"time"
 
-	"github.com/mainadwitiya/forgevm/internal/agentproto"
+	"github.com/DohaerisAI/forgevm/internal/agentproto"
 	"github.com/rs/zerolog"
 )
 

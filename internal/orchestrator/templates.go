@@ -6,7 +6,7 @@ import (
 	"fmt"
 	"time"
 
-	"github.com/mainadwitiya/forgevm/internal/store"
+	"github.com/DohaerisAI/forgevm/internal/store"
 )
 
 // Template represents a reusable sandbox configuration.

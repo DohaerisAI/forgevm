@@ -9,8 +9,8 @@ import (
 	"sync"
 	"time"
 
-	"github.com/mainadwitiya/forgevm/internal/providers"
-	"github.com/mainadwitiya/forgevm/internal/store"
+	"github.com/DohaerisAI/forgevm/internal/providers"
+	"github.com/DohaerisAI/forgevm/internal/store"
 	"github.com/rs/zerolog"
 )
 

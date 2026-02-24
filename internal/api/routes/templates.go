@@ -6,8 +6,8 @@ import (
 	"strings"
 
 	"github.com/go-chi/chi/v5"
-	"github.com/mainadwitiya/forgevm/internal/httputil"
-	"github.com/mainadwitiya/forgevm/internal/orchestrator"
+	"github.com/DohaerisAI/forgevm/internal/httputil"
+	"github.com/DohaerisAI/forgevm/internal/orchestrator"
 )
 
 type TemplateRoutes struct {

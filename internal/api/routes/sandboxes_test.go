@@ -10,9 +10,9 @@ import (
 	"time"
 
 	"github.com/go-chi/chi/v5"
-	"github.com/mainadwitiya/forgevm/internal/orchestrator"
-	"github.com/mainadwitiya/forgevm/internal/providers"
-	"github.com/mainadwitiya/forgevm/internal/store"
+	"github.com/DohaerisAI/forgevm/internal/orchestrator"
+	"github.com/DohaerisAI/forgevm/internal/providers"
+	"github.com/DohaerisAI/forgevm/internal/store"
 	"github.com/rs/zerolog"
 )
 
