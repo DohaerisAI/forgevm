@@ -12,6 +12,9 @@
 </p>
 
 <p align="center">
+  <a href="https://github.com/DohaerisAI/forgevm/stargazers"><img src="https://img.shields.io/github/stars/DohaerisAI/forgevm?style=flat-square" alt="Stars"></a>
+  <a href="https://github.com/DohaerisAI/forgevm/network/members"><img src="https://img.shields.io/github/forks/DohaerisAI/forgevm?style=flat-square" alt="Forks"></a>
+  <a href="https://github.com/DohaerisAI/forgevm/issues"><img src="https://img.shields.io/github/issues/DohaerisAI/forgevm?style=flat-square" alt="Issues"></a>
   <img src="https://img.shields.io/badge/go-1.25+-00ADD8?style=flat-square&logo=go&logoColor=white" alt="Go 1.25+">
   <img src="https://img.shields.io/badge/license-MIT-green?style=flat-square" alt="MIT License">
   <img src="https://img.shields.io/badge/platform-linux-blue?style=flat-square&logo=linux&logoColor=white" alt="Linux">
