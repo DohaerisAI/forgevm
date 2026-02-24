@@ -90,9 +90,9 @@ func setDefaults(v *viper.Viper) {
 	v.SetDefault("server.host", "0.0.0.0")
 	v.SetDefault("server.port", 7423)
 
-	v.SetDefault("providers.default", "firecracker")
-	v.SetDefault("providers.mock.enabled", false)
-	v.SetDefault("providers.firecracker.enabled", true)
+	v.SetDefault("providers.default", "mock")
+	v.SetDefault("providers.mock.enabled", true)
+	v.SetDefault("providers.firecracker.enabled", false)
 	v.SetDefault("providers.firecracker.firecracker_path", "/usr/local/bin/firecracker")
 	v.SetDefault("providers.firecracker.kernel_path", "/var/lib/forgevm/vmlinux.bin")
 	v.SetDefault("providers.firecracker.default_rootfs", "")
@@ -130,7 +130,7 @@ func Load() (*Config, error) {
 
 	v.SetConfigType("yaml")
 
-	v.SetEnvPrefix("HATCHIT")
+	v.SetEnvPrefix("FORGEVM")
 	v.SetEnvKeyReplacer(strings.NewReplacer(".", "_"))
 	v.AutomaticEnv()
 
