@@ -42,63 +42,91 @@ One binary. One command. Your hardware. Your data.
 
 ---
 
+## Prerequisites
+
+- **Linux** (x86_64) with Docker installed
+- **Go 1.25+** ([install](https://go.dev/dl/)) -- only if building from source
+- **KVM support** -- only for Firecracker provider (`ls /dev/kvm`)
+
+---
+
 ## Install
 
-### Option 1: Download binary (fastest)
+### Option 1: Build from source
 
 ```bash
-# Download latest release
+git clone https://github.com/mainadwitiya/forgevm
+cd forgevm
+
+# Build the server + guest agent
+make build-all
+
+# Verify
+./forgevm version
+```
+
+This produces two binaries:
+- `./forgevm` -- the server/CLI
+- `./bin/forgevm-agent` -- the guest agent (injected into sandbox rootfs)
+
+### Option 2: Docker
+
+```bash
+docker build -t forgevm .
+docker run -p 7423:7423 forgevm
+```
+
+### Option 3: Download binary (when releases are available)
+
+```bash
 curl -fsSL https://github.com/mainadwitiya/forgevm/releases/latest/download/forgevm-linux-amd64 -o forgevm
 chmod +x forgevm
 sudo mv forgevm /usr/local/bin/
 ```
 
-### Option 2: Build from source
-
-**Prerequisites:** Go 1.25+ ([install](https://go.dev/dl/))
-
-```bash
-git clone https://github.com/mainadwitiya/forgevm
-cd forgevm
-make build
-sudo mv forgevm /usr/local/bin/
-```
-
-### Option 3: Docker
-
-```bash
-docker run -p 7423:7423 ghcr.io/mainadwitiya/forgevm
-```
-
-### Verify
-
-```bash
-forgevm version
-```
+> **Note:** You still need the guest agent binary for custom Docker images. Build it with `make build-agent`.
 
 ---
 
-## Start the server
+## Quick Start
+
+### 1. Start the server
 
 ```bash
-forgevm serve
+./forgevm serve
 # ForgeVM listening on http://localhost:7423
 ```
 
-That's it. The **mock provider** is enabled by default -- it runs commands on the host using temp directories. No VMs, no KVM, no extra setup. Perfect for trying things out.
+The **mock provider** is enabled by default -- runs commands in temp directories on the host. No VMs, no KVM needed. Perfect for development.
 
-> For real VM isolation, see [Firecracker setup](#firecracker-production) below.
+### 2. Using custom Docker images
 
-### Quick test
+ForgeVM can spawn sandboxes from any Docker image. The server pre-builds a rootfs from the image and injects the guest agent into it.
 
 ```bash
-# Spawn
+# Pre-build a rootfs (optional -- happens automatically on first spawn)
+./forgevm build-image python:3.12
+```
+
+**Important:** The `forgevm-agent` binary must exist at `./bin/forgevm-agent` (relative to where you run the server). If you moved the server binary, set the path in your config:
+
+```yaml
+# forgevm.yaml
+providers:
+  mock:
+    agent_path: "/absolute/path/to/bin/forgevm-agent"
+```
+
+### 3. Test it
+
+```bash
+# Spawn a sandbox
 curl -s -X POST localhost:7423/api/v1/sandboxes \
   -H "Content-Type: application/json" \
   -d '{"image":"alpine:latest"}' | jq .id
 # "sb-a1b2c3d4"
 
-# Run code
+# Run a command
 curl -s -X POST localhost:7423/api/v1/sandboxes/sb-a1b2c3d4/exec \
   -H "Content-Type: application/json" \
   -d '{"command":"echo hello from ForgeVM"}'
@@ -205,6 +233,7 @@ forgevm spawn --image alpine:latest --ttl 1h      # spawn a sandbox
 forgevm list                                       # list sandboxes
 forgevm exec sb-a1b2c3d4 -- echo hello world      # run a command
 forgevm kill sb-a1b2c3d4                           # destroy
+forgevm build-image python:3.12                    # pre-build rootfs from Docker image
 forgevm tui                                        # interactive dashboard
 ```
 
@@ -240,7 +269,7 @@ ForgeVM uses a **provider interface**. Swap backends without changing your code.
 
 ### Mock (default -- zero setup)
 
-Runs commands with `os/exec` in temp directories on the host. No VMs. Ships enabled by default for development and testing.
+Runs commands with `os/exec` in temp directories on the host. No VMs. Ships enabled by default for development and testing. Supports custom Docker images via `build-image`.
 
 ### Firecracker (production)
 
@@ -248,15 +277,15 @@ Real Firecracker microVMs with KVM hardware isolation. Each sandbox gets its own
 
 **Prerequisites:**
 - Linux with KVM support (`ls /dev/kvm`)
-- [Firecracker binary](https://github.com/firecracker-microvm/firecracker/releases)
+- [Firecracker binary](https://github.com/firecracker-microvm/firecracker/releases) in your PATH
 
 ```bash
-# 1. Setup kernel + rootfs
+# 1. Build everything
+make build-all
+
+# 2. Setup kernel + default rootfs
 ./scripts/setup-kernel.sh
 sudo ./scripts/build-rootfs.sh alpine:latest
-
-# 2. Build guest agent
-make build-agent
 
 # 3. Enable in config
 cat > forgevm.yaml <<EOF
@@ -271,7 +300,7 @@ providers:
 EOF
 
 # 4. Start
-forgevm serve
+./forgevm serve
 ```
 
 First spawn cold-boots (~1s) and creates a snapshot. Every spawn after that restores from snapshot in **~28ms**.
@@ -283,17 +312,6 @@ Forwards operations to [E2B](https://e2b.dev) cloud API.
 ### Custom HTTP
 
 Point ForgeVM at any HTTP endpoint that implements the provider protocol.
-
----
-
-## Web Dashboard
-
-Built-in React dashboard with sandbox management, live terminal, file browser, and log viewer.
-
-```bash
-make web          # build frontend
-forgevm serve     # open http://localhost:7423
-```
 
 ---
 
@@ -319,7 +337,18 @@ auth:
   api_key: "your-secret-key"
 ```
 
-Config: `./forgevm.yaml` > `~/.forgevm/config.yaml` > env vars (`FORGEVM_SERVER_PORT=8080`)
+Config priority: `./forgevm.yaml` > `~/.forgevm/config.yaml` > env vars (`FORGEVM_SERVER_PORT=8080`)
+
+---
+
+## Web Dashboard
+
+Built-in React dashboard with sandbox management, live terminal, file browser, and log viewer.
+
+```bash
+make web          # build frontend
+./forgevm serve   # open http://localhost:7423
+```
 
 ---
 
@@ -378,6 +407,7 @@ tui/                      Terminal dashboard
 ```bash
 make build        # build server binary
 make build-agent  # build guest agent (static linux/amd64)
+make build-all    # build both
 make test         # run all tests
 make web          # build frontend
 make lint         # go vet
