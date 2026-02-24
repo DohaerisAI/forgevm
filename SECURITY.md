@@ -6,7 +6,7 @@ If you discover a security vulnerability in ForgeVM, please report it responsibl
 
 **Do NOT open a public GitHub issue for security vulnerabilities.**
 
-Instead, email: **security@forgevm.dev** (or open a private security advisory on GitHub).
+Instead, [open a private security advisory](https://github.com/DohaerisAI/forgevm/security/advisories/new) on GitHub.
 
 We will acknowledge receipt within 48 hours and aim to release a fix within 7 days for critical issues.
 
