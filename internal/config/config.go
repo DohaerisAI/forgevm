@@ -109,7 +109,7 @@ func setDefaults(v *viper.Viper) {
 
 	v.SetDefault("defaults.ttl", "30m")
 	v.SetDefault("defaults.image", "alpine:latest")
-	v.SetDefault("defaults.memory_mb", 512)
+	v.SetDefault("defaults.memory_mb", 1024)
 	v.SetDefault("defaults.vcpus", 1)
 	v.SetDefault("defaults.disk_size_mb", 1024)
 	v.SetDefault("defaults.pool_size", 0)

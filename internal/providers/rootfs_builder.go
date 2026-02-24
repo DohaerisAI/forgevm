@@ -137,10 +137,14 @@ func (ic *ImageCache) build(image, outputPath string) (string, error) {
 
 	tarPath := filepath.Join(tmpDir, "rootfs.tar")
 
-	// Step 1: Pull image
-	ic.logger.Info().Str("image", image).Msg("pulling docker image")
-	if out, err := runCmdCombined("docker", "pull", image); err != nil {
-		return "", fmt.Errorf("docker pull %s: %w\n%s", image, err, out)
+	// Step 1: Pull image (skip if already available locally)
+	if _, err := runCmdCombined("docker", "image", "inspect", image); err != nil {
+		ic.logger.Info().Str("image", image).Msg("pulling docker image")
+		if out, err := runCmdCombined("docker", "pull", image); err != nil {
+			return "", fmt.Errorf("docker pull %s: %w\n%s", image, err, out)
+		}
+	} else {
+		ic.logger.Info().Str("image", image).Msg("image found locally, skipping pull")
 	}
 
 	// Step 2: Export filesystem

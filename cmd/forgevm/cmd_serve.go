@@ -63,6 +63,7 @@ func runServe() error {
 			DefaultRootfs:   cfg.Providers.Firecracker.DefaultRootfs,
 			AgentPath:       cfg.ResolveAgentPath(),
 			DataDir:         cfg.Providers.Firecracker.DataDir,
+			DefaultMemoryMB: cfg.Defaults.MemoryMB,
 		}, logger)
 		registry.Register(fc)
 		fc.CheckDockerAccess()

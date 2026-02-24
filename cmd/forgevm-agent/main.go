@@ -17,6 +17,7 @@ import (
 	"strconv"
 	"syscall"
 	"time"
+	"unsafe"
 
 	"github.com/DohaerisAI/forgevm/internal/agentproto"
 	"github.com/mdlayher/vsock"
@@ -68,6 +69,46 @@ func setupInit() {
 			log.Printf("mount %s: %v", m.target, err)
 		}
 	}
+
+	// Seed entropy — Firecracker VMs start with zero entropy which causes
+	// getrandom() to block forever (breaks numpy, pandas, etc.).
+	seedEntropy()
+}
+
+// seedEntropy writes random bytes to /dev/urandom and credits them to the
+// kernel entropy pool via RNDADDTOENTCNT ioctl. Without this, getrandom()
+// blocks indefinitely in Firecracker VMs that have no hardware RNG.
+func seedEntropy() {
+	const RNDADDTOENTCNT = 0x40045201
+
+	f, err := os.OpenFile("/dev/urandom", os.O_WRONLY, 0)
+	if err != nil {
+		log.Printf("seed entropy: open /dev/urandom: %v", err)
+		return
+	}
+	defer f.Close()
+
+	// Generate seed from time + PID (can't use crypto/rand — it also needs entropy).
+	seed := make([]byte, 512)
+	t := time.Now().UnixNano() ^ int64(os.Getpid())
+	for i := range seed {
+		t = t*6364136223846793005 + 1442695040888963407
+		seed[i] = byte(t >> 33)
+	}
+
+	if _, err := f.Write(seed); err != nil {
+		log.Printf("seed entropy: write: %v", err)
+		return
+	}
+
+	// Credit the entropy pool so getrandom() unblocks.
+	bits := int32(len(seed) * 8)
+	if _, _, errno := syscall.Syscall(syscall.SYS_IOCTL, f.Fd(), RNDADDTOENTCNT, uintptr(unsafe.Pointer(&bits))); errno != 0 {
+		log.Printf("seed entropy: ioctl RNDADDTOENTCNT: %v", errno)
+		return
+	}
+
+	log.Printf("seeded entropy pool with %d bytes (%d bits)", len(seed), bits)
 }
 
 func handleConn(conn net.Conn) {

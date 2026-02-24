@@ -56,6 +56,7 @@ type FirecrackerProviderConfig struct {
 	DefaultRootfs   string
 	AgentPath       string
 	DataDir         string
+	DefaultMemoryMB int
 }
 
 type vmInstance struct {
@@ -199,9 +200,13 @@ func (p *FirecrackerProvider) createBaseSnapshot(rootfsSrc, image string) error 
 	api := newFirecrackerAPI(apiSock)
 
 	// Configure VM identically to a normal spawn.
+	snapMemMB := p.config.DefaultMemoryMB
+	if snapMemMB == 0 {
+		snapMemMB = 1024
+	}
 	if err := api.put(ctx, "/machine-config", map[string]any{
 		"vcpu_count":   1,
-		"mem_size_mib": 512,
+		"mem_size_mib": snapMemMB,
 	}); err != nil {
 		cleanup()
 		return fmt.Errorf("snapshot: set machine config: %w", err)
@@ -476,7 +481,10 @@ func (p *FirecrackerProvider) Spawn(ctx context.Context, opts SpawnOptions) (str
 	}
 	memMB := opts.MemoryMB
 	if memMB == 0 {
-		memMB = 512
+		memMB = p.config.DefaultMemoryMB
+		if memMB == 0 {
+			memMB = 1024
+		}
 	}
 
 	// Machine config.
