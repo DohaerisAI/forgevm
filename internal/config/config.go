@@ -90,9 +90,9 @@ func setDefaults(v *viper.Viper) {
 	v.SetDefault("server.host", "0.0.0.0")
 	v.SetDefault("server.port", 7423)
 
-	v.SetDefault("providers.default", "mock")
-	v.SetDefault("providers.mock.enabled", true)
-	v.SetDefault("providers.firecracker.enabled", false)
+	v.SetDefault("providers.default", "firecracker")
+	v.SetDefault("providers.mock.enabled", false)
+	v.SetDefault("providers.firecracker.enabled", true)
 	v.SetDefault("providers.firecracker.firecracker_path", "/usr/local/bin/firecracker")
 	v.SetDefault("providers.firecracker.kernel_path", "/var/lib/forgevm/vmlinux.bin")
 	v.SetDefault("providers.firecracker.default_rootfs", "")
@@ -122,6 +122,30 @@ func setDefaults(v *viper.Viper) {
 
 	v.SetDefault("logging.level", "info")
 	v.SetDefault("logging.format", "json")
+}
+
+// ResolveAgentPath resolves the agent_path to an absolute path.
+// If the path is relative, it tries (in order):
+//  1. Relative to the executable's directory
+//  2. Relative to CWD (fallback)
+func (c *Config) ResolveAgentPath() string {
+	p := c.Providers.Firecracker.AgentPath
+	if filepath.IsAbs(p) {
+		return p
+	}
+	// Try relative to executable first
+	if exe, err := os.Executable(); err == nil {
+		candidate := filepath.Join(filepath.Dir(exe), p)
+		if _, err := os.Stat(candidate); err == nil {
+			return candidate
+		}
+	}
+	// Fallback to CWD-relative
+	abs, err := filepath.Abs(p)
+	if err != nil {
+		return p
+	}
+	return abs
 }
 
 func Load() (*Config, error) {

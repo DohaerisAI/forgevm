@@ -54,7 +54,7 @@ func runBuildImage(image string, diskMB int) error {
 	fcCfg := cfg.Providers.Firecracker
 	cache := providers.NewImageCache(
 		fcCfg.DataDir+"/images",
-		fcCfg.AgentPath,
+		cfg.ResolveAgentPath(),
 		diskMB,
 		logger,
 	)

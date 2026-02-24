@@ -61,7 +61,7 @@ func runServe() error {
 			FirecrackerPath: cfg.Providers.Firecracker.FirecrackerPath,
 			KernelPath:      cfg.Providers.Firecracker.KernelPath,
 			DefaultRootfs:   cfg.Providers.Firecracker.DefaultRootfs,
-			AgentPath:       cfg.Providers.Firecracker.AgentPath,
+			AgentPath:       cfg.ResolveAgentPath(),
 			DataDir:         cfg.Providers.Firecracker.DataDir,
 		}, logger)
 		registry.Register(fc)
