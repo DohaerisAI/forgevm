@@ -1,0 +1,936 @@
+basePath: /api/v1
+definitions:
+  github_com_forgevm-dev_forgevm_internal_httputil.APIError:
+    properties:
+      code:
+        $ref: '#/definitions/github_com_forgevm-dev_forgevm_internal_httputil.ErrorCode'
+      message:
+        type: string
+    type: object
+  github_com_forgevm-dev_forgevm_internal_httputil.ErrorCode:
+    enum:
+    - NOT_FOUND
+    - BAD_REQUEST
+    - INTERNAL_ERROR
+    - UNAUTHORIZED
+    - CONFLICT
+    - UNAVAILABLE
+    type: string
+    x-enum-varnames:
+    - CodeNotFound
+    - CodeBadRequest
+    - CodeInternal
+    - CodeUnauth
+    - CodeConflict
+    - CodeUnavailable
+  github_com_forgevm-dev_forgevm_internal_orchestrator.Event:
+    properties:
+      data:
+        items:
+          type: integer
+        type: array
+      id:
+        type: string
+      sandbox_id:
+        type: string
+      timestamp:
+        type: string
+      type:
+        $ref: '#/definitions/github_com_forgevm-dev_forgevm_internal_orchestrator.EventType'
+    type: object
+  github_com_forgevm-dev_forgevm_internal_orchestrator.EventType:
+    enum:
+    - sandbox.created
+    - sandbox.running
+    - sandbox.destroyed
+    - sandbox.error
+    - exec.started
+    - exec.completed
+    - file.written
+    - file.read
+    type: string
+    x-enum-varnames:
+    - EventSandboxCreated
+    - EventSandboxRunning
+    - EventSandboxDestroyed
+    - EventSandboxError
+    - EventExecStarted
+    - EventExecCompleted
+    - EventFileWritten
+    - EventFileRead
+  github_com_forgevm-dev_forgevm_internal_orchestrator.ExecRequest:
+    properties:
+      args:
+        items:
+          type: string
+        type: array
+      command:
+        type: string
+      env:
+        additionalProperties:
+          type: string
+        type: object
+      stream:
+        type: boolean
+      timeout:
+        type: string
+      workdir:
+        type: string
+    type: object
+  github_com_forgevm-dev_forgevm_internal_orchestrator.ExecResult:
+    properties:
+      duration:
+        type: string
+      exit_code:
+        type: integer
+      stderr:
+        type: string
+      stdout:
+        type: string
+    type: object
+  github_com_forgevm-dev_forgevm_internal_orchestrator.FileInfo:
+    properties:
+      is_dir:
+        type: boolean
+      mod_time:
+        type: string
+      mode:
+        type: string
+      path:
+        type: string
+      size:
+        type: integer
+    type: object
+  github_com_forgevm-dev_forgevm_internal_orchestrator.FileWriteRequest:
+    properties:
+      content:
+        type: string
+      mode:
+        type: string
+      path:
+        type: string
+    type: object
+  github_com_forgevm-dev_forgevm_internal_orchestrator.Sandbox:
+    properties:
+      created_at:
+        type: string
+      expires_at:
+        type: string
+      id:
+        type: string
+      image:
+        type: string
+      memory_mb:
+        type: integer
+      metadata:
+        additionalProperties:
+          type: string
+        type: object
+      provider:
+        type: string
+      state:
+        $ref: '#/definitions/github_com_forgevm-dev_forgevm_internal_orchestrator.SandboxState'
+      vcpus:
+        type: integer
+    type: object
+  github_com_forgevm-dev_forgevm_internal_orchestrator.SandboxState:
+    enum:
+    - creating
+    - running
+    - idle
+    - destroyed
+    - error
+    type: string
+    x-enum-varnames:
+    - StateCreating
+    - StateRunning
+    - StateIdle
+    - StateDestroyed
+    - StateError
+  github_com_forgevm-dev_forgevm_internal_orchestrator.SecretConfig:
+    properties:
+      inject_at:
+        type: string
+      name:
+        type: string
+    type: object
+  github_com_forgevm-dev_forgevm_internal_orchestrator.SpawnRequest:
+    properties:
+      image:
+        type: string
+      memory_mb:
+        type: integer
+      metadata:
+        additionalProperties:
+          type: string
+        type: object
+      provider:
+        type: string
+      template:
+        type: string
+      ttl:
+        type: string
+      vcpus:
+        type: integer
+    type: object
+  github_com_forgevm-dev_forgevm_internal_orchestrator.Template:
+    properties:
+      allowed_hosts:
+        items:
+          type: string
+        type: array
+      cpu_cores:
+        type: integer
+      created_at:
+        type: string
+      description:
+        type: string
+      env:
+        additionalProperties:
+          type: string
+        type: object
+      image:
+        type: string
+      memory_mb:
+        type: integer
+      name:
+        type: string
+      pool_size:
+        type: integer
+      secrets:
+        items:
+          $ref: '#/definitions/github_com_forgevm-dev_forgevm_internal_orchestrator.SecretConfig'
+        type: array
+      setup:
+        items:
+          type: string
+        type: array
+      ttl_seconds:
+        type: integer
+      updated_at:
+        type: string
+      version:
+        type: integer
+    type: object
+  internal_api_routes.HealthResponse:
+    properties:
+      status:
+        example: ok
+        type: string
+      uptime:
+        example: 2h30m15s
+        type: string
+      version:
+        example: 1.0.0
+        type: string
+    type: object
+  internal_api_routes.MetricsResponse:
+    properties:
+      goroutines:
+        example: 12
+        type: integer
+      memory_alloc_mb:
+        example: 64
+        type: integer
+      providers:
+        example: 2
+        type: integer
+      sandboxes_active:
+        example: 5
+        type: integer
+      uptime:
+        example: 2h30m15s
+        type: string
+    type: object
+  internal_api_routes.ProviderDetail:
+    properties:
+      config:
+        additionalProperties:
+          type: string
+        type: object
+      default:
+        example: true
+        type: boolean
+      healthy:
+        example: true
+        type: boolean
+      name:
+        example: firecracker
+        type: string
+      sandbox_count:
+        example: 3
+        type: integer
+    type: object
+  internal_api_routes.ProviderInfo:
+    properties:
+      default:
+        example: true
+        type: boolean
+      healthy:
+        example: true
+        type: boolean
+      name:
+        example: firecracker
+        type: string
+    type: object
+  internal_api_routes.PruneResponse:
+    properties:
+      pruned:
+        example: 3
+        type: integer
+    type: object
+  internal_api_routes.StatusResponse:
+    properties:
+      status:
+        example: destroyed
+        type: string
+    type: object
+  internal_api_routes.TemplateSpawnOverrides:
+    properties:
+      provider:
+        example: firecracker
+        type: string
+      ttl:
+        example: 30m
+        type: string
+    type: object
+host: localhost:7423
+info:
+  contact: {}
+  description: ForgeVM microVM sandbox orchestrator API
+  title: ForgeVM API
+  version: "1.0"
+paths:
+  /events:
+    get:
+      description: Open an SSE stream for real-time sandbox and system events
+      produces:
+      - text/event-stream
+      responses:
+        "200":
+          description: OK
+          schema:
+            $ref: '#/definitions/github_com_forgevm-dev_forgevm_internal_orchestrator.Event'
+      security:
+      - ApiKeyAuth: []
+      summary: Subscribe to events
+      tags:
+      - system
+  /health:
+    get:
+      description: Return the health status, version, and uptime
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: OK
+          schema:
+            $ref: '#/definitions/internal_api_routes.HealthResponse'
+      security:
+      - ApiKeyAuth: []
+      summary: Health check
+      tags:
+      - system
+  /metrics:
+    get:
+      description: Return runtime metrics including sandbox count, goroutines, and
+        memory usage
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: OK
+          schema:
+            $ref: '#/definitions/internal_api_routes.MetricsResponse'
+      security:
+      - ApiKeyAuth: []
+      summary: Get metrics
+      tags:
+      - system
+  /providers:
+    get:
+      description: Return all registered providers with health status
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: OK
+          schema:
+            items:
+              $ref: '#/definitions/internal_api_routes.ProviderInfo'
+            type: array
+      security:
+      - ApiKeyAuth: []
+      summary: List providers
+      tags:
+      - providers
+  /providers/{providerName}:
+    get:
+      description: Return detailed information about a specific provider
+      parameters:
+      - description: Provider name
+        in: path
+        name: providerName
+        required: true
+        type: string
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: OK
+          schema:
+            $ref: '#/definitions/internal_api_routes.ProviderDetail'
+        "404":
+          description: Not Found
+          schema:
+            $ref: '#/definitions/github_com_forgevm-dev_forgevm_internal_httputil.APIError'
+      security:
+      - ApiKeyAuth: []
+      summary: Get provider details
+      tags:
+      - providers
+  /providers/test:
+    post:
+      description: Run health checks on all registered providers
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: OK
+          schema:
+            additionalProperties:
+              type: boolean
+            type: object
+      security:
+      - ApiKeyAuth: []
+      summary: Test providers
+      tags:
+      - providers
+  /sandboxes:
+    delete:
+      description: Destroy all expired sandboxes and return the count
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: OK
+          schema:
+            $ref: '#/definitions/internal_api_routes.PruneResponse'
+        "500":
+          description: Internal Server Error
+          schema:
+            $ref: '#/definitions/github_com_forgevm-dev_forgevm_internal_httputil.APIError'
+      security:
+      - ApiKeyAuth: []
+      summary: Prune sandboxes
+      tags:
+      - sandboxes
+    get:
+      description: Return all active sandboxes
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: OK
+          schema:
+            items:
+              $ref: '#/definitions/github_com_forgevm-dev_forgevm_internal_orchestrator.Sandbox'
+            type: array
+        "500":
+          description: Internal Server Error
+          schema:
+            $ref: '#/definitions/github_com_forgevm-dev_forgevm_internal_httputil.APIError'
+      security:
+      - ApiKeyAuth: []
+      summary: List sandboxes
+      tags:
+      - sandboxes
+    post:
+      consumes:
+      - application/json
+      description: Spawn a new sandbox with the given configuration
+      parameters:
+      - description: Spawn request
+        in: body
+        name: request
+        required: true
+        schema:
+          $ref: '#/definitions/github_com_forgevm-dev_forgevm_internal_orchestrator.SpawnRequest'
+      produces:
+      - application/json
+      responses:
+        "201":
+          description: Created
+          schema:
+            $ref: '#/definitions/github_com_forgevm-dev_forgevm_internal_orchestrator.Sandbox'
+        "400":
+          description: Bad Request
+          schema:
+            $ref: '#/definitions/github_com_forgevm-dev_forgevm_internal_httputil.APIError'
+        "500":
+          description: Internal Server Error
+          schema:
+            $ref: '#/definitions/github_com_forgevm-dev_forgevm_internal_httputil.APIError'
+      security:
+      - ApiKeyAuth: []
+      summary: Create a sandbox
+      tags:
+      - sandboxes
+  /sandboxes/{sandboxID}:
+    delete:
+      description: Destroy a sandbox and release its resources
+      parameters:
+      - description: Sandbox ID
+        in: path
+        name: sandboxID
+        required: true
+        type: string
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: OK
+          schema:
+            $ref: '#/definitions/internal_api_routes.StatusResponse'
+        "404":
+          description: Not Found
+          schema:
+            $ref: '#/definitions/github_com_forgevm-dev_forgevm_internal_httputil.APIError'
+        "500":
+          description: Internal Server Error
+          schema:
+            $ref: '#/definitions/github_com_forgevm-dev_forgevm_internal_httputil.APIError'
+      security:
+      - ApiKeyAuth: []
+      summary: Destroy a sandbox
+      tags:
+      - sandboxes
+    get:
+      description: Return a sandbox by its ID
+      parameters:
+      - description: Sandbox ID
+        in: path
+        name: sandboxID
+        required: true
+        type: string
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: OK
+          schema:
+            $ref: '#/definitions/github_com_forgevm-dev_forgevm_internal_orchestrator.Sandbox'
+        "404":
+          description: Not Found
+          schema:
+            $ref: '#/definitions/github_com_forgevm-dev_forgevm_internal_httputil.APIError'
+        "500":
+          description: Internal Server Error
+          schema:
+            $ref: '#/definitions/github_com_forgevm-dev_forgevm_internal_httputil.APIError'
+      security:
+      - ApiKeyAuth: []
+      summary: Get a sandbox
+      tags:
+      - sandboxes
+  /sandboxes/{sandboxID}/exec:
+    post:
+      consumes:
+      - application/json
+      description: Run a command inside a sandbox. Set stream=true for streaming output.
+      parameters:
+      - description: Sandbox ID
+        in: path
+        name: sandboxID
+        required: true
+        type: string
+      - description: Exec request
+        in: body
+        name: request
+        required: true
+        schema:
+          $ref: '#/definitions/github_com_forgevm-dev_forgevm_internal_orchestrator.ExecRequest'
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: OK
+          schema:
+            $ref: '#/definitions/github_com_forgevm-dev_forgevm_internal_orchestrator.ExecResult'
+        "404":
+          description: Not Found
+          schema:
+            $ref: '#/definitions/github_com_forgevm-dev_forgevm_internal_httputil.APIError'
+        "500":
+          description: Internal Server Error
+          schema:
+            $ref: '#/definitions/github_com_forgevm-dev_forgevm_internal_httputil.APIError'
+      security:
+      - ApiKeyAuth: []
+      summary: Execute a command
+      tags:
+      - sandboxes
+  /sandboxes/{sandboxID}/exec/ws:
+    get:
+      description: Open a WebSocket connection to execute a command with streaming
+        output
+      parameters:
+      - description: Sandbox ID
+        in: path
+        name: sandboxID
+        required: true
+        type: string
+      responses:
+        "101":
+          description: WebSocket upgrade
+        "400":
+          description: Bad request
+      security:
+      - ApiKeyAuth: []
+      summary: Execute via WebSocket
+      tags:
+      - sandboxes
+  /sandboxes/{sandboxID}/files:
+    get:
+      description: Read file content from a sandbox
+      parameters:
+      - description: Sandbox ID
+        in: path
+        name: sandboxID
+        required: true
+        type: string
+      - description: File path inside the sandbox
+        in: query
+        name: path
+        required: true
+        type: string
+      produces:
+      - application/octet-stream
+      responses:
+        "200":
+          description: OK
+          schema:
+            type: file
+        "400":
+          description: Bad Request
+          schema:
+            $ref: '#/definitions/github_com_forgevm-dev_forgevm_internal_httputil.APIError'
+        "404":
+          description: Not Found
+          schema:
+            $ref: '#/definitions/github_com_forgevm-dev_forgevm_internal_httputil.APIError'
+        "500":
+          description: Internal Server Error
+          schema:
+            $ref: '#/definitions/github_com_forgevm-dev_forgevm_internal_httputil.APIError'
+      security:
+      - ApiKeyAuth: []
+      summary: Read a file
+      tags:
+      - sandboxes
+    post:
+      consumes:
+      - application/json
+      description: Write content to a file inside a sandbox
+      parameters:
+      - description: Sandbox ID
+        in: path
+        name: sandboxID
+        required: true
+        type: string
+      - description: File write request
+        in: body
+        name: request
+        required: true
+        schema:
+          $ref: '#/definitions/github_com_forgevm-dev_forgevm_internal_orchestrator.FileWriteRequest'
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: OK
+          schema:
+            $ref: '#/definitions/internal_api_routes.StatusResponse'
+        "400":
+          description: Bad Request
+          schema:
+            $ref: '#/definitions/github_com_forgevm-dev_forgevm_internal_httputil.APIError'
+        "404":
+          description: Not Found
+          schema:
+            $ref: '#/definitions/github_com_forgevm-dev_forgevm_internal_httputil.APIError'
+        "500":
+          description: Internal Server Error
+          schema:
+            $ref: '#/definitions/github_com_forgevm-dev_forgevm_internal_httputil.APIError'
+      security:
+      - ApiKeyAuth: []
+      summary: Write a file
+      tags:
+      - sandboxes
+  /sandboxes/{sandboxID}/files/list:
+    get:
+      description: List files in a directory inside a sandbox
+      parameters:
+      - description: Sandbox ID
+        in: path
+        name: sandboxID
+        required: true
+        type: string
+      - description: 'Directory path (default: /)'
+        in: query
+        name: path
+        type: string
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: OK
+          schema:
+            items:
+              $ref: '#/definitions/github_com_forgevm-dev_forgevm_internal_orchestrator.FileInfo'
+            type: array
+        "404":
+          description: Not Found
+          schema:
+            $ref: '#/definitions/github_com_forgevm-dev_forgevm_internal_httputil.APIError'
+        "500":
+          description: Internal Server Error
+          schema:
+            $ref: '#/definitions/github_com_forgevm-dev_forgevm_internal_httputil.APIError'
+      security:
+      - ApiKeyAuth: []
+      summary: List files
+      tags:
+      - sandboxes
+  /sandboxes/{sandboxID}/logs:
+    get:
+      description: Retrieve console log lines from a sandbox
+      parameters:
+      - description: Sandbox ID
+        in: path
+        name: sandboxID
+        required: true
+        type: string
+      - description: 'Number of lines to retrieve (default: 100)'
+        in: query
+        name: lines
+        type: integer
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: OK
+          schema:
+            items:
+              type: string
+            type: array
+        "404":
+          description: Not Found
+          schema:
+            $ref: '#/definitions/github_com_forgevm-dev_forgevm_internal_httputil.APIError'
+        "500":
+          description: Internal Server Error
+          schema:
+            $ref: '#/definitions/github_com_forgevm-dev_forgevm_internal_httputil.APIError'
+      security:
+      - ApiKeyAuth: []
+      summary: Get console logs
+      tags:
+      - sandboxes
+  /templates:
+    get:
+      description: Return all registered templates
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: OK
+          schema:
+            items:
+              $ref: '#/definitions/github_com_forgevm-dev_forgevm_internal_orchestrator.Template'
+            type: array
+        "500":
+          description: Internal Server Error
+          schema:
+            $ref: '#/definitions/github_com_forgevm-dev_forgevm_internal_httputil.APIError'
+      security:
+      - ApiKeyAuth: []
+      summary: List templates
+      tags:
+      - templates
+    post:
+      consumes:
+      - application/json
+      description: Register a new sandbox template
+      parameters:
+      - description: Template definition
+        in: body
+        name: request
+        required: true
+        schema:
+          $ref: '#/definitions/github_com_forgevm-dev_forgevm_internal_orchestrator.Template'
+      produces:
+      - application/json
+      responses:
+        "201":
+          description: Created
+          schema:
+            $ref: '#/definitions/github_com_forgevm-dev_forgevm_internal_orchestrator.Template'
+        "400":
+          description: Bad Request
+          schema:
+            $ref: '#/definitions/github_com_forgevm-dev_forgevm_internal_httputil.APIError'
+        "409":
+          description: Conflict
+          schema:
+            $ref: '#/definitions/github_com_forgevm-dev_forgevm_internal_httputil.APIError'
+        "500":
+          description: Internal Server Error
+          schema:
+            $ref: '#/definitions/github_com_forgevm-dev_forgevm_internal_httputil.APIError'
+      security:
+      - ApiKeyAuth: []
+      summary: Create a template
+      tags:
+      - templates
+  /templates/{name}:
+    delete:
+      description: Delete a template by name
+      parameters:
+      - description: Template name
+        in: path
+        name: name
+        required: true
+        type: string
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: OK
+          schema:
+            $ref: '#/definitions/internal_api_routes.StatusResponse'
+        "404":
+          description: Not Found
+          schema:
+            $ref: '#/definitions/github_com_forgevm-dev_forgevm_internal_httputil.APIError'
+        "500":
+          description: Internal Server Error
+          schema:
+            $ref: '#/definitions/github_com_forgevm-dev_forgevm_internal_httputil.APIError'
+      security:
+      - ApiKeyAuth: []
+      summary: Delete a template
+      tags:
+      - templates
+    get:
+      description: Return a template by its name
+      parameters:
+      - description: Template name
+        in: path
+        name: name
+        required: true
+        type: string
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: OK
+          schema:
+            $ref: '#/definitions/github_com_forgevm-dev_forgevm_internal_orchestrator.Template'
+        "404":
+          description: Not Found
+          schema:
+            $ref: '#/definitions/github_com_forgevm-dev_forgevm_internal_httputil.APIError'
+        "500":
+          description: Internal Server Error
+          schema:
+            $ref: '#/definitions/github_com_forgevm-dev_forgevm_internal_httputil.APIError'
+      security:
+      - ApiKeyAuth: []
+      summary: Get a template
+      tags:
+      - templates
+    put:
+      consumes:
+      - application/json
+      description: Update an existing template by name
+      parameters:
+      - description: Template name
+        in: path
+        name: name
+        required: true
+        type: string
+      - description: Updated template
+        in: body
+        name: request
+        required: true
+        schema:
+          $ref: '#/definitions/github_com_forgevm-dev_forgevm_internal_orchestrator.Template'
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: OK
+          schema:
+            $ref: '#/definitions/github_com_forgevm-dev_forgevm_internal_orchestrator.Template'
+        "400":
+          description: Bad Request
+          schema:
+            $ref: '#/definitions/github_com_forgevm-dev_forgevm_internal_httputil.APIError'
+        "404":
+          description: Not Found
+          schema:
+            $ref: '#/definitions/github_com_forgevm-dev_forgevm_internal_httputil.APIError'
+        "500":
+          description: Internal Server Error
+          schema:
+            $ref: '#/definitions/github_com_forgevm-dev_forgevm_internal_httputil.APIError'
+      security:
+      - ApiKeyAuth: []
+      summary: Update a template
+      tags:
+      - templates
+  /templates/{name}/spawn:
+    post:
+      consumes:
+      - application/json
+      description: Create a new sandbox using a template's configuration, with optional
+        overrides
+      parameters:
+      - description: Template name
+        in: path
+        name: name
+        required: true
+        type: string
+      - description: Optional overrides
+        in: body
+        name: request
+        schema:
+          $ref: '#/definitions/internal_api_routes.TemplateSpawnOverrides'
+      produces:
+      - application/json
+      responses:
+        "201":
+          description: Created
+          schema:
+            $ref: '#/definitions/github_com_forgevm-dev_forgevm_internal_orchestrator.Sandbox'
+        "404":
+          description: Not Found
+          schema:
+            $ref: '#/definitions/github_com_forgevm-dev_forgevm_internal_httputil.APIError'
+        "500":
+          description: Internal Server Error
+          schema:
+            $ref: '#/definitions/github_com_forgevm-dev_forgevm_internal_httputil.APIError'
+      security:
+      - ApiKeyAuth: []
+      summary: Spawn from template
+      tags:
+      - templates
+securityDefinitions:
+  ApiKeyAuth:
+    in: header
+    name: X-API-Key
+    type: apiKey
+swagger: "2.0"
