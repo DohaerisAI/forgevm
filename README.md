@@ -1,4 +1,6 @@
-<h1 align="center">ForgeVM</h1>
+<p align="center">
+  <img src="assets/logo.png" alt="ForgeVM" width="500">
+</p>
 
 <p align="center">
   <b>Your AI agent just got its own computer.</b>
