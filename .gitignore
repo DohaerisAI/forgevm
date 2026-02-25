@@ -51,6 +51,7 @@ web/dist/
 # Environment
 .env
 .env.local
+custom-image-automation-plan.local.md
 
 # Coverage
 coverage/

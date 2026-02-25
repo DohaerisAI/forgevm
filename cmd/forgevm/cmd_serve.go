@@ -9,6 +9,7 @@ import (
 
 	"github.com/DohaerisAI/forgevm/internal/api"
 	"github.com/DohaerisAI/forgevm/internal/config"
+	"github.com/DohaerisAI/forgevm/internal/environments"
 	"github.com/DohaerisAI/forgevm/internal/orchestrator"
 	"github.com/DohaerisAI/forgevm/internal/providers"
 	"github.com/DohaerisAI/forgevm/internal/store"
@@ -114,6 +115,11 @@ func runServe() error {
 	pool.Start()
 	defer pool.Stop()
 
+	// Environment build manager
+	envBuilds := environments.NewManager(st, logger)
+	envBuilds.Start(1)
+	defer envBuilds.Stop()
+
 	// Auth warning
 	if cfg.Auth.APIKey == "" {
 		logger.Warn().Msg("WARNING: no API key configured — all endpoints are unauthenticated. Set auth.api_key in config or FORGEVM_AUTH_API_KEY env var")
@@ -124,7 +130,7 @@ func runServe() error {
 		Addr:    cfg.Server.Addr(),
 		APIKey:  cfg.Auth.APIKey,
 		Version: version,
-	}, registry, mgr, events, templates, pool, logger)
+	}, registry, mgr, events, templates, pool, st, envBuilds, logger)
 
 	// Graceful shutdown
 	errCh := make(chan error, 1)

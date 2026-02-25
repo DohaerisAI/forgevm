@@ -50,7 +50,7 @@ func setupTestServer(t *testing.T) *httptest.Server {
 	srv := api.NewServer(api.ServerConfig{
 		Addr:    ":0",
 		Version: "test",
-	}, reg, mgr, events, templates, pool, logger)
+	}, reg, mgr, events, templates, pool, st, nil, logger)
 
 	ts := httptest.NewServer(srv.Handler())
 	t.Cleanup(ts.Close)
