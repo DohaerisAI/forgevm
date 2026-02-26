@@ -49,9 +49,22 @@ One binary. One command. Your hardware. Your data.
 
 ## Prerequisites
 
-- **Linux** (x86_64) with Docker installed
-- **Go 1.25+** ([install](https://go.dev/dl/)) -- only if building from source
-- **KVM support** -- only for Firecracker provider (`ls /dev/kvm`)
+- **Linux** (x86_64) -- bare metal or WSL2
+- **KVM support** -- `ls /dev/kvm` (enable virtualization in BIOS)
+- **Go 1.25+** ([install](https://go.dev/dl/))
+- **Docker** ([install](https://docs.docker.com/engine/install/))
+
+```bash
+# Ubuntu/Debian -- install all dependencies
+sudo apt-get update && sudo apt-get install -y \
+    docker.io qemu-kvm xfsprogs curl git make
+
+# Add yourself to docker + kvm groups (log out/in after)
+sudo usermod -aG docker,kvm $(whoami)
+
+# Fix KVM permissions (needed on WSL2, resets on reboot)
+sudo chmod 666 /dev/kvm
+```
 
 ---
 
@@ -65,14 +78,12 @@ cd forgevm
 ./scripts/setup.sh
 ```
 
-This single script checks and installs everything:
-- Go 1.25+ (checks only -- install manually if missing)
-- Docker (checks it's running)
-- KVM permissions (`/dev/kvm`)
-- Firecracker binary (auto-downloads if missing)
-- Data directory (`/var/lib/forgevm`)
-- Kernel binary (downloads prebuilt vmlinux)
-- Builds both `forgevm` and `forgevm-agent`
+This single script handles everything:
+- Checks Go 1.25+, Docker, KVM
+- Downloads and installs Firecracker binary
+- Creates XFS reflink volume at `/var/lib/forgevm` (instant COW rootfs copies = ~35ms spawns)
+- Downloads prebuilt vmlinux kernel
+- Builds `forgevm` server and `forgevm-agent` guest binary
 
 Once done, just run `./forgevm serve`.
 
@@ -342,12 +353,12 @@ server:
   port: 7423
 
 providers:
-  default: "mock"
+  default: "firecracker"
 
 defaults:
   ttl: "30m"
   image: "alpine:latest"
-  memory_mb: 512
+  memory_mb: 1024
   vcpus: 1
 
 auth:
