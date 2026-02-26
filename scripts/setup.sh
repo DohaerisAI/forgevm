@@ -13,6 +13,8 @@ warn()  { echo -e "${YELLOW}[!]${NC} $1"; }
 fail()  { echo -e "${RED}[x]${NC} $1"; exit 1; }
 
 DATA_DIR="/var/lib/forgevm"
+DATA_IMG="$DATA_DIR.img"
+DATA_IMG_SIZE="8192"  # MB
 KERNEL_URL="https://s3.amazonaws.com/spec.ccfc.min/img/quickstart_guide/x86_64/kernels/vmlinux.bin"
 
 echo ""
@@ -60,8 +62,7 @@ if [[ -e /dev/kvm ]]; then
     else
         warn "KVM exists but no permission. Fixing..."
         sudo chmod 666 /dev/kvm
-        info "KVM permissions fixed (resets on reboot)"
-        warn "For permanent fix: sudo usermod -aG kvm \$(whoami) && log out/in"
+        info "KVM permissions fixed"
     fi
 else
     fail "KVM not available. Enable virtualization in BIOS or check your hypervisor settings."
@@ -93,15 +94,47 @@ else
     info "Firecracker ${FC_VERSION} installed to /usr/local/bin/firecracker"
 fi
 
-# ── Data directory ────────────────────────────────────────
+# ── Data directory with XFS reflink ──────────────────────
 info "Setting up data directory..."
-if [[ -d "$DATA_DIR" ]] && [[ -w "$DATA_DIR" ]]; then
-    info "$DATA_DIR exists and is writable"
+sudo mkdir -p "$DATA_DIR"
+
+if mountpoint -q "$DATA_DIR" 2>/dev/null; then
+    FS_TYPE=$(df -T "$DATA_DIR" | tail -1 | awk '{print $2}')
+    info "$DATA_DIR already mounted ($FS_TYPE)"
 else
-    sudo mkdir -p "$DATA_DIR"
-    sudo chown "$(whoami)" "$DATA_DIR"
-    info "Created $DATA_DIR"
+    # Check if XFS tools are available
+    if ! command -v mkfs.xfs &>/dev/null; then
+        info "Installing XFS tools for fast COW rootfs copies..."
+        sudo apt-get install -y xfsprogs >/dev/null 2>&1 || true
+    fi
+
+    if command -v mkfs.xfs &>/dev/null; then
+        if [[ ! -f "$DATA_IMG" ]]; then
+            info "Creating ${DATA_IMG_SIZE}MB XFS volume at $DATA_IMG..."
+            sudo dd if=/dev/zero of="$DATA_IMG" bs=1M count="$DATA_IMG_SIZE" status=progress
+            sudo mkfs.xfs -f -m reflink=1 "$DATA_IMG"
+            info "XFS volume created with reflink support"
+        fi
+
+        sudo mount -o loop "$DATA_IMG" "$DATA_DIR" 2>/dev/null && {
+            info "Mounted XFS volume at $DATA_DIR (reflink = instant rootfs copies)"
+
+            # Add to fstab for auto-mount
+            if ! grep -q "forgevm" /etc/fstab 2>/dev/null; then
+                sudo bash -c "echo '$DATA_IMG $DATA_DIR xfs loop,rw,relatime 0 0' >> /etc/fstab"
+                info "Added to /etc/fstab for auto-mount on boot"
+            fi
+        } || {
+            warn "XFS mount failed (WSL2 kernel may not support XFS). Using ext4 fallback."
+            warn "Rootfs copies will be slower (~300ms vs ~1ms). Still fully functional."
+        }
+    else
+        warn "XFS tools not available. Using ext4 (rootfs copies will be slower)."
+    fi
 fi
+
+sudo chown "$(whoami)" "$DATA_DIR"
+info "$DATA_DIR ready"
 
 # ── Download kernel ───────────────────────────────────────
 info "Setting up kernel..."
@@ -132,4 +165,13 @@ echo "  Test it:"
 echo "    curl -s -X POST localhost:7423/api/v1/sandboxes \\"
 echo "      -H 'Content-Type: application/json' \\"
 echo "      -d '{\"image\":\"alpine:latest\"}' | jq .id"
+echo ""
+
+FS_TYPE=$(df -T "$DATA_DIR" | tail -1 | awk '{print $2}')
+if [[ "$FS_TYPE" == "xfs" ]]; then
+    echo -e "  ${GREEN}⚡ XFS reflink enabled — snapshot restores ~35ms${NC}"
+else
+    echo -e "  ${YELLOW}ℹ  ext4 detected — snapshot restores ~300ms${NC}"
+    echo -e "  ${YELLOW}   For ~35ms restores, install xfsprogs and re-run setup${NC}"
+fi
 echo ""

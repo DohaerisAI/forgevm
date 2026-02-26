@@ -1037,11 +1037,10 @@ func waitForAgent(vsockUDSPath string, cid uint32, timeout time.Duration) (net.C
 }
 
 func copyFile(src, dst string) error {
-	// Use cp --sparse=always to skip zero blocks. For a 1GB rootfs with ~100MB
-	// of actual data, this reduces copy time from ~900ms to ~100ms.
-	cmd := exec.Command("cp", "--sparse=always", src, dst)
+	// Try reflink first (instant COW on XFS/btrfs), fall back to sparse copy.
+	cmd := exec.Command("cp", "--reflink=auto", "--sparse=always", src, dst)
 	if out, err := cmd.CombinedOutput(); err != nil {
-		return fmt.Errorf("cp --sparse=always: %s: %w", string(out), err)
+		return fmt.Errorf("cp: %s: %w", string(out), err)
 	}
 	return nil
 }
