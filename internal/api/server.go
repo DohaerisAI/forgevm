@@ -65,7 +65,7 @@ func NewServer(cfg ServerConfig, registry *providers.Registry, manager *orchestr
 			return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 				w.Header().Set("Access-Control-Allow-Origin", "*")
 				w.Header().Set("Access-Control-Allow-Methods", "GET, POST, PUT, DELETE, OPTIONS")
-				w.Header().Set("Access-Control-Allow-Headers", "Content-Type, X-API-Key, X-Request-ID")
+				w.Header().Set("Access-Control-Allow-Headers", "Content-Type, X-API-Key, X-Request-ID, X-User-ID")
 				if r.Method == "OPTIONS" {
 					w.WriteHeader(http.StatusOK)
 					return
@@ -88,6 +88,7 @@ func NewServer(cfg ServerConfig, registry *providers.Registry, manager *orchestr
 			r.Mount("/templates", templateRoutes.Routes())
 			r.Mount("/snapshots", snapshotRoutes.Routes())
 			r.Mount("/environments", environmentRoutes.Routes())
+			r.Get("/pool/status", sandboxRoutes.VMPoolStatus)
 			r.Mount("/", systemRoutes.Routes())
 		})
 	})

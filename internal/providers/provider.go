@@ -68,6 +68,21 @@ type Provider interface {
 	// ListFiles lists files at the given path in the sandbox.
 	ListFiles(ctx context.Context, sandboxID string, path string) ([]FileInfo, error)
 
+	// DeleteFile deletes a file or directory in the sandbox.
+	DeleteFile(ctx context.Context, sandboxID string, path string, recursive bool) error
+
+	// MoveFile moves/renames a file in the sandbox.
+	MoveFile(ctx context.Context, sandboxID string, oldPath, newPath string) error
+
+	// ChmodFile changes file permissions in the sandbox.
+	ChmodFile(ctx context.Context, sandboxID string, path string, mode string) error
+
+	// StatFile returns info about a single file in the sandbox.
+	StatFile(ctx context.Context, sandboxID string, path string) (*FileInfo, error)
+
+	// GlobFiles returns paths matching a glob pattern in the sandbox.
+	GlobFiles(ctx context.Context, sandboxID string, pattern string) ([]string, error)
+
 	// Status returns the current status of a sandbox.
 	Status(ctx context.Context, sandboxID string) (*SandboxStatus, error)
 

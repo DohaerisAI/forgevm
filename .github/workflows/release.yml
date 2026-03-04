@@ -1,0 +1,59 @@
+name: Release
+
+on:
+  push:
+    tags: ["v*"]
+
+permissions:
+  contents: write
+
+jobs:
+  test:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-go@v5
+        with:
+          go-version-file: go.mod
+
+      - name: Vet
+        run: go vet ./...
+
+      - name: Test
+        run: go test ./...
+
+  build:
+    needs: test
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-go@v5
+        with:
+          go-version-file: go.mod
+
+      - name: Build forgevm
+        run: >
+          CGO_ENABLED=0 GOOS=linux GOARCH=amd64
+          go build -ldflags="-s -w -X main.version=${{ github.ref_name }}"
+          -o forgevm-linux-amd64 ./cmd/forgevm
+
+      - name: Build forgevm-agent
+        run: >
+          CGO_ENABLED=0 GOOS=linux GOARCH=amd64
+          go build -ldflags="-s -w"
+          -o forgevm-agent-linux-amd64 ./cmd/forgevm-agent
+
+      - name: Generate checksums
+        run: sha256sum forgevm-linux-amd64 forgevm-agent-linux-amd64 > checksums.txt
+
+      - name: Create GitHub Release
+        uses: softprops/action-gh-release@v2
+        with:
+          generate_release_notes: true
+          prerelease: ${{ contains(github.ref_name, '-') }}
+          files: |
+            forgevm-linux-amd64
+            forgevm-agent-linux-amd64
+            checksums.txt

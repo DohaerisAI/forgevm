@@ -3,6 +3,7 @@ package config
 import (
 	"fmt"
 	"os"
+	"os/exec"
 	"path/filepath"
 	"strings"
 
@@ -16,6 +17,17 @@ type Config struct {
 	Auth      AuthConfig      `mapstructure:"auth"`
 	Database  DatabaseConfig  `mapstructure:"database"`
 	Logging   LoggingConfig   `mapstructure:"logging"`
+	Pool      PoolConfig      `mapstructure:"pool"`
+}
+
+type PoolConfig struct {
+	Enabled       bool   `mapstructure:"enabled"`
+	MaxVMs        int    `mapstructure:"max_vms"`
+	MaxUsersPerVM int    `mapstructure:"max_users_per_vm"`
+	Image         string `mapstructure:"image"`
+	MemoryMB      int    `mapstructure:"memory_mb"`
+	VCPUs         int    `mapstructure:"vcpus"`
+	Overflow      string `mapstructure:"overflow"` // "reject" or "queue"
 }
 
 type ServerConfig struct {
@@ -122,12 +134,21 @@ func setDefaults(v *viper.Viper) {
 
 	v.SetDefault("logging.level", "info")
 	v.SetDefault("logging.format", "json")
+
+	v.SetDefault("pool.enabled", false)
+	v.SetDefault("pool.max_vms", 10)
+	v.SetDefault("pool.max_users_per_vm", 5)
+	v.SetDefault("pool.image", "alpine:latest")
+	v.SetDefault("pool.memory_mb", 2048)
+	v.SetDefault("pool.vcpus", 2)
+	v.SetDefault("pool.overflow", "reject")
 }
 
 // ResolveAgentPath resolves the agent_path to an absolute path.
 // If the path is relative, it tries (in order):
 //  1. Relative to the executable's directory
-//  2. Relative to CWD (fallback)
+//  2. Relative to CWD
+//  3. PATH lookup via exec.LookPath (for /usr/local/bin installs)
 func (c *Config) ResolveAgentPath() string {
 	p := c.Providers.Firecracker.AgentPath
 	if filepath.IsAbs(p) {
@@ -140,12 +161,19 @@ func (c *Config) ResolveAgentPath() string {
 			return candidate
 		}
 	}
-	// Fallback to CWD-relative
-	abs, err := filepath.Abs(p)
-	if err != nil {
-		return p
+	// Try CWD-relative
+	if abs, err := filepath.Abs(p); err == nil {
+		if _, err := os.Stat(abs); err == nil {
+			return abs
+		}
 	}
-	return abs
+	// Fallback: look up the binary name in PATH
+	base := filepath.Base(p)
+	if found, err := exec.LookPath(base); err == nil {
+		return found
+	}
+	// Last resort: return as-is
+	return p
 }
 
 func Load() (*Config, error) {

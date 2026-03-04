@@ -2,13 +2,16 @@ package orchestrator
 
 import (
 	"context"
+	"crypto/rand"
 	"encoding/json"
 	"fmt"
 	"io"
+	"path/filepath"
 	"strings"
 	"sync"
 	"time"
 
+	"github.com/DohaerisAI/forgevm/internal/config"
 	"github.com/DohaerisAI/forgevm/internal/providers"
 	"github.com/DohaerisAI/forgevm/internal/store"
 	"github.com/rs/zerolog"
@@ -28,6 +31,9 @@ type Manager struct {
 	defaultMemory int
 	defaultVCPUs  int
 
+	vmPoolMgr  *VMPoolManager
+	poolConfig config.PoolConfig
+
 	ctx    context.Context
 	cancel context.CancelFunc
 }
@@ -37,6 +43,7 @@ type ManagerConfig struct {
 	DefaultImage  string
 	DefaultMemory int
 	DefaultVCPUs  int
+	Pool          config.PoolConfig
 }
 
 func NewManager(registry *providers.Registry, st store.Store, events *EventBus, logger zerolog.Logger, cfg ManagerConfig) *Manager {
@@ -51,6 +58,7 @@ func NewManager(registry *providers.Registry, st store.Store, events *EventBus, 
 		defaultImage:  cfg.DefaultImage,
 		defaultMemory: cfg.DefaultMemory,
 		defaultVCPUs:  cfg.DefaultVCPUs,
+		poolConfig:    cfg.Pool,
 		ctx:           ctx,
 		cancel:        cancel,
 	}
@@ -135,12 +143,19 @@ func (m *Manager) Spawn(ctx context.Context, req SpawnRequest) (*Sandbox, error)
 	}
 
 	now := time.Now()
+
+	// Pool mode: acquire a VM slot instead of spawning a new VM.
+	if m.vmPoolMgr != nil {
+		return m.spawnPooled(ctx, prov, req, image, memMB, vcpus, ttl, now)
+	}
+
 	sb := &Sandbox{
 		State:     StateCreating,
 		Provider:  prov.Name(),
 		Image:     image,
 		MemoryMB:  memMB,
 		VCPUs:     vcpus,
+		OwnerID:   req.OwnerID,
 		CreatedAt: now,
 		ExpiresAt: now.Add(ttl),
 		Metadata:  req.Metadata,
@@ -169,6 +184,8 @@ func (m *Manager) Spawn(ctx context.Context, req SpawnRequest) (*Sandbox, error)
 		MemoryMB:  sb.MemoryMB,
 		VCPUs:     sb.VCPUs,
 		Metadata:  string(metaJSON),
+		OwnerID:   sb.OwnerID,
+		VMID:      sb.VMID,
 		CreatedAt: sb.CreatedAt,
 		ExpiresAt: sb.ExpiresAt,
 		UpdatedAt: now,
@@ -195,24 +212,101 @@ func (m *Manager) Spawn(ctx context.Context, req SpawnRequest) (*Sandbox, error)
 	return sb, nil
 }
 
+// spawnPooled creates a logical sandbox on a shared pool VM.
+func (m *Manager) spawnPooled(ctx context.Context, prov providers.Provider, req SpawnRequest, image string, memMB, vcpus int, ttl time.Duration, now time.Time) (*Sandbox, error) {
+	// Generate a logical sandbox ID (not tied to a VM).
+	b := make([]byte, 4)
+	rand.Read(b)
+	sandboxID := fmt.Sprintf("sb-%08x", b)
+
+	// Acquire a VM slot (may spawn a new VM if needed).
+	vmID, err := m.vmPoolMgr.Acquire(ctx, sandboxID)
+	if err != nil {
+		return nil, fmt.Errorf("pool acquire: %w", err)
+	}
+
+	sb := &Sandbox{
+		ID:        sandboxID,
+		State:     StateRunning,
+		Provider:  prov.Name(),
+		Image:     image,
+		MemoryMB:  memMB,
+		VCPUs:     vcpus,
+		OwnerID:   req.OwnerID,
+		VMID:      vmID,
+		CreatedAt: now,
+		ExpiresAt: now.Add(ttl),
+		Metadata:  req.Metadata,
+	}
+
+	// Create the sandbox's isolated workspace on the VM.
+	workspaceDir := "/workspace/" + sandboxID
+	_, err = prov.Exec(ctx, vmID, providers.ExecOptions{
+		Command: "mkdir -p " + workspaceDir,
+	})
+	if err != nil {
+		m.vmPoolMgr.Release(vmID, sandboxID)
+		return nil, fmt.Errorf("creating workspace: %w", err)
+	}
+
+	// Persist
+	metaJSON, _ := json.Marshal(sb.Metadata)
+	if err := m.store.CreateSandbox(ctx, &store.SandboxRecord{
+		ID:        sb.ID,
+		State:     string(sb.State),
+		Provider:  sb.Provider,
+		Image:     sb.Image,
+		MemoryMB:  sb.MemoryMB,
+		VCPUs:     sb.VCPUs,
+		Metadata:  string(metaJSON),
+		OwnerID:   sb.OwnerID,
+		VMID:      sb.VMID,
+		CreatedAt: sb.CreatedAt,
+		ExpiresAt: sb.ExpiresAt,
+		UpdatedAt: now,
+	}); err != nil {
+		m.vmPoolMgr.Release(vmID, sandboxID)
+		return nil, fmt.Errorf("persisting sandbox: %w", err)
+	}
+
+	m.mu.Lock()
+	m.sandboxes[sandboxID] = sb
+	m.mu.Unlock()
+
+	m.events.Publish(Event{Type: EventSandboxCreated, SandboxID: sandboxID})
+	m.events.Publish(Event{Type: EventSandboxRunning, SandboxID: sandboxID})
+
+	m.logger.Info().
+		Str("sandbox", sandboxID).
+		Str("vm_id", vmID).
+		Str("owner", req.OwnerID).
+		Msg("pooled sandbox spawned")
+	return sb, nil
+}
+
 func (m *Manager) Exec(ctx context.Context, sandboxID string, req ExecRequest) (*ExecResult, error) {
 	sb, prov, err := m.getSandboxAndProvider(sandboxID)
 	if err != nil {
 		return nil, err
 	}
-	_ = sb
 
 	m.events.Publish(Event{
 		Type:      EventExecStarted,
 		SandboxID: sandboxID,
 	})
 
+	// In pool mode, default workdir to the sandbox's workspace.
+	workDir := req.WorkDir
+	if workDir == "" && sb.VMID != "" {
+		workDir = "/workspace/" + sandboxID
+	}
+
 	start := time.Now()
-	result, err := prov.Exec(ctx, sandboxID, providers.ExecOptions{
+	result, err := prov.Exec(ctx, m.resolveVMID(sb), providers.ExecOptions{
 		Command: req.Command,
 		Args:    req.Args,
 		Env:     req.Env,
-		WorkDir: req.WorkDir,
+		WorkDir: workDir,
 	})
 	if err != nil {
 		return nil, fmt.Errorf("exec: %w", err)
@@ -246,21 +340,26 @@ func (m *Manager) Exec(ctx context.Context, sandboxID string, req ExecRequest) (
 }
 
 func (m *Manager) ExecStream(ctx context.Context, sandboxID string, req ExecRequest) (<-chan providers.StreamChunk, error) {
-	_, prov, err := m.getSandboxAndProvider(sandboxID)
+	sb, prov, err := m.getSandboxAndProvider(sandboxID)
 	if err != nil {
 		return nil, err
 	}
 
-	return prov.ExecStream(ctx, sandboxID, providers.ExecOptions{
+	workDir := req.WorkDir
+	if workDir == "" && sb.VMID != "" {
+		workDir = "/workspace/" + sandboxID
+	}
+
+	return prov.ExecStream(ctx, m.resolveVMID(sb), providers.ExecOptions{
 		Command: req.Command,
 		Args:    req.Args,
 		Env:     req.Env,
-		WorkDir: req.WorkDir,
+		WorkDir: workDir,
 	})
 }
 
 func (m *Manager) WriteFile(ctx context.Context, sandboxID string, req FileWriteRequest) error {
-	_, prov, err := m.getSandboxAndProvider(sandboxID)
+	sb, prov, err := m.getSandboxAndProvider(sandboxID)
 	if err != nil {
 		return err
 	}
@@ -270,7 +369,8 @@ func (m *Manager) WriteFile(ctx context.Context, sandboxID string, req FileWrite
 		mode = "0644"
 	}
 
-	if err := prov.WriteFile(ctx, sandboxID, req.Path, strings.NewReader(req.Content), mode); err != nil {
+	path := m.scopedPath(sb, req.Path)
+	if err := prov.WriteFile(ctx, m.resolveVMID(sb), path, strings.NewReader(req.Content), mode); err != nil {
 		return fmt.Errorf("writing file: %w", err)
 	}
 
@@ -282,12 +382,12 @@ func (m *Manager) WriteFile(ctx context.Context, sandboxID string, req FileWrite
 }
 
 func (m *Manager) ReadFile(ctx context.Context, sandboxID string, path string) ([]byte, error) {
-	_, prov, err := m.getSandboxAndProvider(sandboxID)
+	sb, prov, err := m.getSandboxAndProvider(sandboxID)
 	if err != nil {
 		return nil, err
 	}
 
-	rc, err := prov.ReadFile(ctx, sandboxID, path)
+	rc, err := prov.ReadFile(ctx, m.resolveVMID(sb), m.scopedPath(sb, path))
 	if err != nil {
 		return nil, fmt.Errorf("reading file: %w", err)
 	}
@@ -306,12 +406,12 @@ func (m *Manager) ReadFile(ctx context.Context, sandboxID string, path string) (
 }
 
 func (m *Manager) ListFiles(ctx context.Context, sandboxID string, path string) ([]FileInfo, error) {
-	_, prov, err := m.getSandboxAndProvider(sandboxID)
+	sb, prov, err := m.getSandboxAndProvider(sandboxID)
 	if err != nil {
 		return nil, err
 	}
 
-	pFiles, err := prov.ListFiles(ctx, sandboxID, path)
+	pFiles, err := prov.ListFiles(ctx, m.resolveVMID(sb), m.scopedPath(sb, path))
 	if err != nil {
 		return nil, err
 	}
@@ -327,6 +427,176 @@ func (m *Manager) ListFiles(ctx context.Context, sandboxID string, path string) 
 		}
 	}
 	return files, nil
+}
+
+func (m *Manager) DeleteFile(ctx context.Context, sandboxID string, req FileDeleteRequest) error {
+	sb, prov, err := m.getSandboxAndProvider(sandboxID)
+	if err != nil {
+		return err
+	}
+
+	path := m.scopedPath(sb, req.Path)
+	return prov.DeleteFile(ctx, m.resolveVMID(sb), path, req.Recursive)
+}
+
+func (m *Manager) MoveFile(ctx context.Context, sandboxID string, req FileMoveRequest) error {
+	sb, prov, err := m.getSandboxAndProvider(sandboxID)
+	if err != nil {
+		return err
+	}
+
+	oldPath := m.scopedPath(sb, req.OldPath)
+	newPath := m.scopedPath(sb, req.NewPath)
+	return prov.MoveFile(ctx, m.resolveVMID(sb), oldPath, newPath)
+}
+
+func (m *Manager) ChmodFile(ctx context.Context, sandboxID string, req FileChmodRequest) error {
+	sb, prov, err := m.getSandboxAndProvider(sandboxID)
+	if err != nil {
+		return err
+	}
+
+	path := m.scopedPath(sb, req.Path)
+	return prov.ChmodFile(ctx, m.resolveVMID(sb), path, req.Mode)
+}
+
+func (m *Manager) StatFile(ctx context.Context, sandboxID string, path string) (*FileInfo, error) {
+	sb, prov, err := m.getSandboxAndProvider(sandboxID)
+	if err != nil {
+		return nil, err
+	}
+
+	scopedPath := m.scopedPath(sb, path)
+	fi, err := prov.StatFile(ctx, m.resolveVMID(sb), scopedPath)
+	if err != nil {
+		return nil, err
+	}
+	return &FileInfo{
+		Path:    fi.Path,
+		Size:    fi.Size,
+		Mode:    fi.Mode,
+		IsDir:   fi.IsDir,
+		ModTime: fi.ModTime,
+	}, nil
+}
+
+func (m *Manager) GlobFiles(ctx context.Context, sandboxID string, pattern string) ([]string, error) {
+	sb, prov, err := m.getSandboxAndProvider(sandboxID)
+	if err != nil {
+		return nil, err
+	}
+
+	scopedPattern := m.scopedPath(sb, pattern)
+	return prov.GlobFiles(ctx, m.resolveVMID(sb), scopedPattern)
+}
+
+// scopedPath prefixes a path with the sandbox workspace when running in pool mode.
+func (m *Manager) scopedPath(sb *Sandbox, path string) string {
+	if sb.VMID == "" {
+		return path // dedicated VM, no scoping
+	}
+	base := "/workspace/" + sb.ID
+	cleaned := filepath.Clean(filepath.Join(base, path))
+	if !strings.HasPrefix(cleaned, base+"/") && cleaned != base {
+		return base
+	}
+	return cleaned
+}
+
+// resolveVMID returns the VM sandbox ID for provider calls.
+// In pool mode, operations go to the VM (sb.VMID); in 1:1 mode, to the sandbox itself.
+func (m *Manager) resolveVMID(sb *Sandbox) string {
+	if sb.VMID != "" {
+		return sb.VMID
+	}
+	return sb.ID
+}
+
+// VMPoolStatus returns the current VM pool status. Returns nil if pool is disabled.
+func (m *Manager) VMPoolStatus() *VMPoolStatus {
+	if m.vmPoolMgr == nil {
+		return nil
+	}
+	status := m.vmPoolMgr.Status()
+	return &status
+}
+
+// InitVMPool initializes the VM pool manager if pool mode is enabled.
+func (m *Manager) InitVMPool() {
+	if !m.poolConfig.Enabled {
+		return
+	}
+	// Use spawnDirect (bypasses pool check) to avoid infinite recursion.
+	m.vmPoolMgr = NewVMPoolManager(m.poolConfig, m.spawnDirect, m.logger)
+	m.logger.Info().Int("max_vms", m.poolConfig.MaxVMs).Int("max_users_per_vm", m.poolConfig.MaxUsersPerVM).Msg("VM pool mode enabled")
+}
+
+// spawnDirect spawns a VM directly via the provider, bypassing pool logic.
+// Used by the pool manager to create pool VMs without recursion.
+func (m *Manager) spawnDirect(ctx context.Context, req SpawnRequest) (*Sandbox, error) {
+	providerName := req.Provider
+	prov, err := m.registry.Get(providerName)
+	if err != nil {
+		return nil, fmt.Errorf("getting provider: %w", err)
+	}
+
+	image := req.Image
+	if image == "" {
+		image = m.defaultImage
+	}
+	memMB := req.MemoryMB
+	if memMB == 0 {
+		memMB = m.defaultMemory
+	}
+	vcpus := req.VCPUs
+	if vcpus == 0 {
+		vcpus = m.defaultVCPUs
+	}
+
+	now := time.Now()
+	id, err := prov.Spawn(ctx, providers.SpawnOptions{
+		Image:    image,
+		MemoryMB: memMB,
+		VCPUs:    vcpus,
+	})
+	if err != nil {
+		return nil, fmt.Errorf("spawning VM: %w", err)
+	}
+
+	sb := &Sandbox{
+		ID:        id,
+		State:     StateRunning,
+		Provider:  prov.Name(),
+		Image:     image,
+		MemoryMB:  memMB,
+		VCPUs:     vcpus,
+		CreatedAt: now,
+		ExpiresAt: now.Add(m.defaultTTL),
+	}
+
+	metaJSON, _ := json.Marshal(sb.Metadata)
+	if err := m.store.CreateSandbox(ctx, &store.SandboxRecord{
+		ID:        sb.ID,
+		State:     string(sb.State),
+		Provider:  sb.Provider,
+		Image:     sb.Image,
+		MemoryMB:  sb.MemoryMB,
+		VCPUs:     sb.VCPUs,
+		Metadata:  string(metaJSON),
+		CreatedAt: sb.CreatedAt,
+		ExpiresAt: sb.ExpiresAt,
+		UpdatedAt: now,
+	}); err != nil {
+		prov.Destroy(ctx, id)
+		return nil, fmt.Errorf("persisting pool VM: %w", err)
+	}
+
+	m.mu.Lock()
+	m.sandboxes[id] = sb
+	m.mu.Unlock()
+
+	m.logger.Info().Str("vm_id", id).Str("image", image).Msg("pool VM spawned")
+	return sb, nil
 }
 
 func (m *Manager) ConsoleLog(ctx context.Context, sandboxID string, lines int) ([]string, error) {
@@ -383,6 +653,15 @@ func (m *Manager) List(ctx context.Context) ([]*Sandbox, error) {
 }
 
 func (m *Manager) Destroy(ctx context.Context, id string) error {
+	// Check if this is a pooled sandbox.
+	m.mu.RLock()
+	sb := m.sandboxes[id]
+	m.mu.RUnlock()
+
+	if sb != nil && sb.VMID != "" && m.vmPoolMgr != nil {
+		return m.destroyPooled(ctx, id, sb)
+	}
+
 	prov, err := m.getProvider(id)
 	if err != nil {
 		// If we can't find the provider, just update the store
@@ -412,6 +691,47 @@ func (m *Manager) Destroy(ctx context.Context, id string) error {
 	})
 
 	m.logger.Info().Str("sandbox", id).Msg("sandbox destroyed")
+	return nil
+}
+
+// destroyPooled cleans up a pooled sandbox's workspace and releases the VM slot.
+func (m *Manager) destroyPooled(ctx context.Context, id string, sb *Sandbox) error {
+	vmID := sb.VMID
+
+	// Clean up workspace on the VM.
+	prov, err := m.registry.Get(sb.Provider)
+	if err == nil {
+		workspaceDir := "/workspace/" + id
+		_ = prov.DeleteFile(ctx, vmID, workspaceDir, true)
+	}
+
+	// Release the VM slot; if VM is now empty, destroy it.
+	shouldDestroy := m.vmPoolMgr.Release(vmID, id)
+	if shouldDestroy {
+		if prov != nil {
+			if err := prov.Destroy(ctx, vmID); err != nil {
+				m.logger.Debug().Err(err).Str("vm_id", vmID).Msg("pool VM destroy failed")
+			}
+		}
+		// Clean up the VM's sandbox record too.
+		m.store.DeleteSandbox(ctx, vmID)
+		m.mu.Lock()
+		delete(m.sandboxes, vmID)
+		m.mu.Unlock()
+		m.logger.Info().Str("vm_id", vmID).Msg("empty pool VM destroyed")
+	}
+
+	// Clean up the logical sandbox record.
+	m.store.UpdateSandboxState(ctx, id, string(StateDestroyed))
+	m.mu.Lock()
+	if cached, ok := m.sandboxes[id]; ok {
+		cached.State = StateDestroyed
+	}
+	delete(m.sandboxes, id)
+	m.mu.Unlock()
+
+	m.events.Publish(Event{Type: EventSandboxDestroyed, SandboxID: id})
+	m.logger.Info().Str("sandbox", id).Str("vm_id", vmID).Msg("pooled sandbox destroyed")
 	return nil
 }
 
@@ -509,6 +829,8 @@ func recordToSandbox(r *store.SandboxRecord) *Sandbox {
 		Image:     r.Image,
 		MemoryMB:  r.MemoryMB,
 		VCPUs:     r.VCPUs,
+		OwnerID:   r.OwnerID,
+		VMID:      r.VMID,
 		CreatedAt: r.CreatedAt,
 		ExpiresAt: r.ExpiresAt,
 		Metadata:  metadata,

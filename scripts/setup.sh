@@ -1,6 +1,10 @@
 #!/bin/bash
-# ForgeVM — one-command setup
+# ForgeVM — full development setup (builds from source, configures XFS reflink)
 # Usage: ./scripts/setup.sh
+#
+# For pre-built binary installs (no Go required), use instead:
+#   curl -fsSL https://raw.githubusercontent.com/DohaerisAI/forgevm/main/scripts/install.sh | bash
+#
 set -euo pipefail
 
 RED='\033[0;31m'
