@@ -77,9 +77,10 @@ func (s *SQLiteStore) migrate() error {
 
 func (s *SQLiteStore) CreateSandbox(ctx context.Context, sb *SandboxRecord) error {
 	_, err := s.db.ExecContext(ctx, `
-		INSERT INTO sandboxes (id, state, provider, image, memory_mb, vcpus, metadata, created_at, expires_at, updated_at)
-		VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
+		INSERT INTO sandboxes (id, state, provider, image, memory_mb, vcpus, metadata, owner_id, vm_id, created_at, expires_at, updated_at)
+		VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
 		sb.ID, sb.State, sb.Provider, sb.Image, sb.MemoryMB, sb.VCPUs, sb.Metadata,
+		sb.OwnerID, sb.VMID,
 		sb.CreatedAt.UTC(), sb.ExpiresAt.UTC(), sb.UpdatedAt.UTC(),
 	)
 	return err
@@ -88,10 +89,10 @@ func (s *SQLiteStore) CreateSandbox(ctx context.Context, sb *SandboxRecord) erro
 func (s *SQLiteStore) GetSandbox(ctx context.Context, id string) (*SandboxRecord, error) {
 	sb := &SandboxRecord{}
 	err := s.db.QueryRowContext(ctx, `
-		SELECT id, state, provider, image, memory_mb, vcpus, metadata, created_at, expires_at, updated_at
+		SELECT id, state, provider, image, memory_mb, vcpus, metadata, owner_id, vm_id, created_at, expires_at, updated_at
 		FROM sandboxes WHERE id = ?`, id,
 	).Scan(&sb.ID, &sb.State, &sb.Provider, &sb.Image, &sb.MemoryMB, &sb.VCPUs,
-		&sb.Metadata, &sb.CreatedAt, &sb.ExpiresAt, &sb.UpdatedAt)
+		&sb.Metadata, &sb.OwnerID, &sb.VMID, &sb.CreatedAt, &sb.ExpiresAt, &sb.UpdatedAt)
 	if err == sql.ErrNoRows {
 		return nil, fmt.Errorf("sandbox %q not found", id)
 	}
@@ -100,7 +101,7 @@ func (s *SQLiteStore) GetSandbox(ctx context.Context, id string) (*SandboxRecord
 
 func (s *SQLiteStore) ListSandboxes(ctx context.Context) ([]*SandboxRecord, error) {
 	rows, err := s.db.QueryContext(ctx, `
-		SELECT id, state, provider, image, memory_mb, vcpus, metadata, created_at, expires_at, updated_at
+		SELECT id, state, provider, image, memory_mb, vcpus, metadata, owner_id, vm_id, created_at, expires_at, updated_at
 		FROM sandboxes WHERE state != 'destroyed' ORDER BY created_at DESC`)
 	if err != nil {
 		return nil, err
@@ -111,7 +112,7 @@ func (s *SQLiteStore) ListSandboxes(ctx context.Context) ([]*SandboxRecord, erro
 	for rows.Next() {
 		sb := &SandboxRecord{}
 		if err := rows.Scan(&sb.ID, &sb.State, &sb.Provider, &sb.Image, &sb.MemoryMB, &sb.VCPUs,
-			&sb.Metadata, &sb.CreatedAt, &sb.ExpiresAt, &sb.UpdatedAt); err != nil {
+			&sb.Metadata, &sb.OwnerID, &sb.VMID, &sb.CreatedAt, &sb.ExpiresAt, &sb.UpdatedAt); err != nil {
 			return nil, err
 		}
 		sandboxes = append(sandboxes, sb)
@@ -155,7 +156,7 @@ func (s *SQLiteStore) DeleteSandbox(ctx context.Context, id string) error {
 
 func (s *SQLiteStore) ListExpiredSandboxes(ctx context.Context, before time.Time) ([]*SandboxRecord, error) {
 	rows, err := s.db.QueryContext(ctx, `
-		SELECT id, state, provider, image, memory_mb, vcpus, metadata, created_at, expires_at, updated_at
+		SELECT id, state, provider, image, memory_mb, vcpus, metadata, owner_id, vm_id, created_at, expires_at, updated_at
 		FROM sandboxes WHERE state NOT IN ('destroyed') AND expires_at < ?`,
 		before.UTC(),
 	)
@@ -168,12 +169,40 @@ func (s *SQLiteStore) ListExpiredSandboxes(ctx context.Context, before time.Time
 	for rows.Next() {
 		sb := &SandboxRecord{}
 		if err := rows.Scan(&sb.ID, &sb.State, &sb.Provider, &sb.Image, &sb.MemoryMB, &sb.VCPUs,
-			&sb.Metadata, &sb.CreatedAt, &sb.ExpiresAt, &sb.UpdatedAt); err != nil {
+			&sb.Metadata, &sb.OwnerID, &sb.VMID, &sb.CreatedAt, &sb.ExpiresAt, &sb.UpdatedAt); err != nil {
 			return nil, err
 		}
 		sandboxes = append(sandboxes, sb)
 	}
 	return sandboxes, rows.Err()
+}
+
+func (s *SQLiteStore) ListSandboxesByOwner(ctx context.Context, ownerID string) ([]*SandboxRecord, error) {
+	rows, err := s.db.QueryContext(ctx, `
+		SELECT id, state, provider, image, memory_mb, vcpus, metadata, owner_id, vm_id, created_at, expires_at, updated_at
+		FROM sandboxes WHERE state != 'destroyed' AND owner_id = ? ORDER BY created_at DESC`, ownerID)
+	if err != nil {
+		return nil, err
+	}
+	defer rows.Close()
+
+	var sandboxes []*SandboxRecord
+	for rows.Next() {
+		sb := &SandboxRecord{}
+		if err := rows.Scan(&sb.ID, &sb.State, &sb.Provider, &sb.Image, &sb.MemoryMB, &sb.VCPUs,
+			&sb.Metadata, &sb.OwnerID, &sb.VMID, &sb.CreatedAt, &sb.ExpiresAt, &sb.UpdatedAt); err != nil {
+			return nil, err
+		}
+		sandboxes = append(sandboxes, sb)
+	}
+	return sandboxes, rows.Err()
+}
+
+func (s *SQLiteStore) CountSandboxesByVM(ctx context.Context, vmID string) (int, error) {
+	var count int
+	err := s.db.QueryRowContext(ctx, `
+		SELECT COUNT(*) FROM sandboxes WHERE state != 'destroyed' AND vm_id = ?`, vmID).Scan(&count)
+	return count, err
 }
 
 // --- Exec Logs ---

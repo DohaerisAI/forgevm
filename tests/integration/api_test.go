@@ -204,6 +204,157 @@ func TestExecNonZeroExit(t *testing.T) {
 	}
 }
 
+func TestExtendedFileOps(t *testing.T) {
+	ts := setupTestServer(t)
+
+	// Spawn sandbox
+	resp := doJSON(t, ts, "POST", "/api/v1/sandboxes", map[string]string{"image": "alpine"})
+	var sb orchestrator.Sandbox
+	decodeJSON(t, resp, &sb)
+	id := sb.ID
+
+	// Write a file
+	resp = doJSON(t, ts, "POST", "/api/v1/sandboxes/"+id+"/files", map[string]string{
+		"path": "/workspace/hello.txt", "content": "hello world",
+	})
+	if resp.StatusCode != 200 {
+		t.Fatalf("write: expected 200, got %d", resp.StatusCode)
+	}
+	resp.Body.Close()
+
+	// Stat the file
+	req, _ := http.NewRequest("GET", ts.URL+"/api/v1/sandboxes/"+id+"/files/stat?path=/workspace/hello.txt", nil)
+	resp, _ = http.DefaultClient.Do(req)
+	if resp.StatusCode != 200 {
+		t.Fatalf("stat: expected 200, got %d", resp.StatusCode)
+	}
+	var fi orchestrator.FileInfo
+	decodeJSON(t, resp, &fi)
+	if fi.Size != 11 {
+		t.Fatalf("stat size: expected 11, got %d", fi.Size)
+	}
+	if fi.IsDir {
+		t.Fatal("stat: expected file, not dir")
+	}
+
+	// Move the file
+	resp = doJSON(t, ts, "POST", "/api/v1/sandboxes/"+id+"/files/move", map[string]string{
+		"old_path": "/workspace/hello.txt", "new_path": "/workspace/greeting.txt",
+	})
+	if resp.StatusCode != 200 {
+		body, _ := io.ReadAll(resp.Body)
+		t.Fatalf("move: expected 200, got %d: %s", resp.StatusCode, string(body))
+	}
+	resp.Body.Close()
+
+	// Read from new location
+	req, _ = http.NewRequest("GET", ts.URL+"/api/v1/sandboxes/"+id+"/files?path=/workspace/greeting.txt", nil)
+	resp, _ = http.DefaultClient.Do(req)
+	if resp.StatusCode != 200 {
+		t.Fatalf("read moved: expected 200, got %d", resp.StatusCode)
+	}
+	body, _ := io.ReadAll(resp.Body)
+	resp.Body.Close()
+	if string(body) != "hello world" {
+		t.Fatalf("read moved: expected 'hello world', got %q", string(body))
+	}
+
+	// Chmod
+	resp = doJSON(t, ts, "POST", "/api/v1/sandboxes/"+id+"/files/chmod", map[string]string{
+		"path": "/workspace/greeting.txt", "mode": "0755",
+	})
+	if resp.StatusCode != 200 {
+		body, _ := io.ReadAll(resp.Body)
+		t.Fatalf("chmod: expected 200, got %d: %s", resp.StatusCode, string(body))
+	}
+	resp.Body.Close()
+
+	// Write more files for glob test
+	for _, name := range []string{"a.log", "b.log", "c.txt"} {
+		resp = doJSON(t, ts, "POST", "/api/v1/sandboxes/"+id+"/files", map[string]string{
+			"path": "/workspace/" + name, "content": "data",
+		})
+		resp.Body.Close()
+	}
+
+	// Glob for .log files
+	req, _ = http.NewRequest("GET", ts.URL+"/api/v1/sandboxes/"+id+"/files/glob?pattern=/workspace/*.log", nil)
+	resp, _ = http.DefaultClient.Do(req)
+	if resp.StatusCode != 200 {
+		t.Fatalf("glob: expected 200, got %d", resp.StatusCode)
+	}
+	var matches []string
+	decodeJSON(t, resp, &matches)
+	if len(matches) != 2 {
+		t.Fatalf("glob: expected 2 matches, got %d: %v", len(matches), matches)
+	}
+
+	// Delete a file
+	req, _ = http.NewRequest("DELETE", ts.URL+"/api/v1/sandboxes/"+id+"/files?path=/workspace/greeting.txt", nil)
+	resp, _ = http.DefaultClient.Do(req)
+	if resp.StatusCode != 200 {
+		t.Fatalf("delete: expected 200, got %d", resp.StatusCode)
+	}
+	resp.Body.Close()
+
+	// Verify deleted
+	req, _ = http.NewRequest("GET", ts.URL+"/api/v1/sandboxes/"+id+"/files?path=/workspace/greeting.txt", nil)
+	resp, _ = http.DefaultClient.Do(req)
+	if resp.StatusCode == 200 {
+		t.Fatal("expected file to be deleted")
+	}
+	resp.Body.Close()
+
+	// Cleanup
+	resp = doJSON(t, ts, "DELETE", "/api/v1/sandboxes/"+id, nil)
+	resp.Body.Close()
+}
+
+func TestPoolStatusEndpoint(t *testing.T) {
+	ts := setupTestServer(t)
+
+	req, _ := http.NewRequest("GET", ts.URL+"/api/v1/pool/status", nil)
+	resp, err := http.DefaultClient.Do(req)
+	if err != nil {
+		t.Fatalf("pool status: %v", err)
+	}
+	if resp.StatusCode != 200 {
+		t.Fatalf("pool status: expected 200, got %d", resp.StatusCode)
+	}
+
+	var status map[string]interface{}
+	decodeJSON(t, resp, &status)
+	// Pool is not enabled in test config, so we expect enabled=false
+	if status["enabled"] != false {
+		t.Fatalf("expected pool disabled, got %v", status["enabled"])
+	}
+}
+
+func TestOwnerIDHeader(t *testing.T) {
+	ts := setupTestServer(t)
+
+	body, _ := json.Marshal(map[string]string{"image": "alpine:latest"})
+	req, _ := http.NewRequest("POST", ts.URL+"/api/v1/sandboxes", bytes.NewReader(body))
+	req.Header.Set("Content-Type", "application/json")
+	req.Header.Set("X-User-ID", "bob")
+	resp, err := http.DefaultClient.Do(req)
+	if err != nil {
+		t.Fatalf("spawn with owner: %v", err)
+	}
+	if resp.StatusCode != 201 {
+		body, _ := io.ReadAll(resp.Body)
+		t.Fatalf("spawn: expected 201, got %d: %s", resp.StatusCode, string(body))
+	}
+	var sb orchestrator.Sandbox
+	decodeJSON(t, resp, &sb)
+	if sb.OwnerID != "bob" {
+		t.Fatalf("expected owner_id 'bob', got %q", sb.OwnerID)
+	}
+
+	// Cleanup
+	doJSON(t, ts, "DELETE", "/api/v1/sandboxes/"+sb.ID, nil)
+}
+
 func TestSandboxNotFound(t *testing.T) {
 	ts := setupTestServer(t)
 

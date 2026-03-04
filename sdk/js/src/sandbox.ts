@@ -273,6 +273,88 @@ export class Sandbox {
     return (await response.json()) as FileInfo[];
   }
 
+  /**
+   * Delete a file or directory inside the sandbox.
+   *
+   * @param path - Absolute path inside the sandbox.
+   * @param recursive - If true, recursively delete directories.
+   */
+  async deleteFile(path: string, recursive?: boolean): Promise<void> {
+    const params = new URLSearchParams({ path });
+    if (recursive) params.set("recursive", "true");
+    const response = await this._fetch(
+      `/api/v1/sandboxes/${this.id}/files?${params.toString()}`,
+      { method: "DELETE" },
+    );
+    await handleResponse(response, this.id);
+  }
+
+  /**
+   * Move/rename a file inside the sandbox.
+   *
+   * @param oldPath - Source path.
+   * @param newPath - Destination path.
+   */
+  async moveFile(oldPath: string, newPath: string): Promise<void> {
+    const response = await this._fetch(
+      `/api/v1/sandboxes/${this.id}/files/move`,
+      {
+        method: "POST",
+        body: JSON.stringify({ old_path: oldPath, new_path: newPath }),
+      },
+    );
+    await handleResponse(response, this.id);
+  }
+
+  /**
+   * Change file permissions inside the sandbox.
+   *
+   * @param path - Absolute path inside the sandbox.
+   * @param mode - Octal permission string (e.g. `"0755"`).
+   */
+  async chmodFile(path: string, mode: string): Promise<void> {
+    const response = await this._fetch(
+      `/api/v1/sandboxes/${this.id}/files/chmod`,
+      {
+        method: "POST",
+        body: JSON.stringify({ path, mode }),
+      },
+    );
+    await handleResponse(response, this.id);
+  }
+
+  /**
+   * Get file info for a single file inside the sandbox.
+   *
+   * @param path - Absolute path inside the sandbox.
+   * @returns File info object.
+   */
+  async statFile(path: string): Promise<FileInfo> {
+    const params = new URLSearchParams({ path });
+    const response = await this._fetch(
+      `/api/v1/sandboxes/${this.id}/files/stat?${params.toString()}`,
+      { method: "GET" },
+    );
+    await handleResponse(response, this.id);
+    return (await response.json()) as FileInfo;
+  }
+
+  /**
+   * Return paths matching a glob pattern inside the sandbox.
+   *
+   * @param pattern - Glob pattern (e.g. `"/tmp/*.txt"`).
+   * @returns Array of matching paths.
+   */
+  async globFiles(pattern: string): Promise<string[]> {
+    const params = new URLSearchParams({ pattern });
+    const response = await this._fetch(
+      `/api/v1/sandboxes/${this.id}/files/glob?${params.toString()}`,
+      { method: "GET" },
+    );
+    await handleResponse(response, this.id);
+    return (await response.json()) as string[];
+  }
+
   // -----------------------------------------------------------------------
   // TTL management
   // -----------------------------------------------------------------------

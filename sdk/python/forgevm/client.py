@@ -24,11 +24,14 @@ class Client:
         self,
         base_url: str = "http://localhost:7423",
         api_key: str | None = None,
+        user_id: str | None = None,
         timeout: float = 30.0,
     ):
         headers = {}
         if api_key:
             headers["X-API-Key"] = api_key
+        if user_id:
+            headers["X-User-ID"] = user_id
 
         self._http = httpx.Client(
             base_url=base_url,
@@ -98,6 +101,12 @@ class Client:
         resp = self._http.delete("/api/v1/sandboxes")
         handle_response(resp)
         return resp.json().get("pruned", 0)
+
+    def pool_status(self) -> dict:
+        """Get VM pool status."""
+        resp = self._http.get("/api/v1/pool/status")
+        handle_response(resp)
+        return resp.json()
 
     def health(self) -> dict:
         """Check server health."""

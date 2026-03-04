@@ -13,6 +13,11 @@ const (
 	MethodWriteFile  = "write_file"
 	MethodReadFile   = "read_file"
 	MethodListFiles  = "list_files"
+	MethodDeleteFile = "delete_file"
+	MethodMoveFile   = "move_file"
+	MethodChmodFile  = "chmod_file"
+	MethodStatFile   = "stat_file"
+	MethodGlobFiles  = "glob_files"
 	MethodShutdown   = "shutdown"
 )
 
@@ -94,4 +99,37 @@ type FileInfoResult struct {
 	Mode    string `json:"mode"`
 	IsDir   bool   `json:"is_dir"`
 	ModTime string `json:"mod_time"`
+}
+
+// DeleteFileParams are parameters for delete_file.
+type DeleteFileParams struct {
+	Path      string `json:"path"`
+	Recursive bool   `json:"recursive"`
+}
+
+// MoveFileParams are parameters for move_file.
+type MoveFileParams struct {
+	OldPath string `json:"old_path"`
+	NewPath string `json:"new_path"`
+}
+
+// ChmodFileParams are parameters for chmod_file.
+type ChmodFileParams struct {
+	Path string `json:"path"`
+	Mode string `json:"mode"`
+}
+
+// StatFileParams are parameters for stat_file.
+type StatFileParams struct {
+	Path string `json:"path"`
+}
+
+// GlobFilesParams are parameters for glob_files.
+type GlobFilesParams struct {
+	Pattern string `json:"pattern"`
+}
+
+// GlobFilesResult is returned by glob_files.
+type GlobFilesResult struct {
+	Matches []string `json:"matches"`
 }

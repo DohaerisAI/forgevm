@@ -264,10 +264,25 @@ export interface ForgevmClientOptions {
    */
   apiKey?: string;
   /**
+   * User ID for multi-tenant pool mode. Sent as `X-User-ID` header.
+   */
+  userId?: string;
+  /**
    * Request timeout in milliseconds.
    * @defaultValue `30000`
    */
   timeout?: number;
+}
+
+/**
+ * VM pool status information.
+ */
+export interface VMPoolStatus {
+  enabled: boolean;
+  vms: number;
+  max_vms: number;
+  total_users: number;
+  max_users_per_vm: number;
 }
 
 // ---------------------------------------------------------------------------

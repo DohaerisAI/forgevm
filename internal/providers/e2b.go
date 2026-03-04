@@ -188,6 +188,26 @@ func (p *E2BProvider) ListFiles(ctx context.Context, sandboxID string, path stri
 	return result, nil
 }
 
+func (p *E2BProvider) DeleteFile(ctx context.Context, sandboxID string, path string, recursive bool) error {
+	return fmt.Errorf("e2b: delete_file not supported")
+}
+
+func (p *E2BProvider) MoveFile(ctx context.Context, sandboxID string, oldPath, newPath string) error {
+	return fmt.Errorf("e2b: move_file not supported")
+}
+
+func (p *E2BProvider) ChmodFile(ctx context.Context, sandboxID string, path string, mode string) error {
+	return fmt.Errorf("e2b: chmod_file not supported")
+}
+
+func (p *E2BProvider) StatFile(ctx context.Context, sandboxID string, path string) (*FileInfo, error) {
+	return nil, fmt.Errorf("e2b: stat_file not supported")
+}
+
+func (p *E2BProvider) GlobFiles(ctx context.Context, sandboxID string, pattern string) ([]string, error) {
+	return nil, fmt.Errorf("e2b: glob_files not supported")
+}
+
 func (p *E2BProvider) Status(ctx context.Context, sandboxID string) (*SandboxStatus, error) {
 	data, code, err := p.doRequest(ctx, "GET", fmt.Sprintf("/sandboxes/%s", sandboxID), nil)
 	if err != nil {

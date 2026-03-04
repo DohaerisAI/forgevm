@@ -783,6 +783,129 @@ func (p *FirecrackerProvider) ListFiles(ctx context.Context, sandboxID string, p
 	return files, nil
 }
 
+func (p *FirecrackerProvider) DeleteFile(ctx context.Context, sandboxID string, path string, recursive bool) error {
+	vm, err := p.getVM(sandboxID)
+	if err != nil {
+		return err
+	}
+
+	params, _ := agentproto.MarshalParams(&agentproto.DeleteFileParams{Path: path, Recursive: recursive})
+	resp, err := vm.sendRequest(&agentproto.Request{
+		ID:     generateRequestID(),
+		Method: agentproto.MethodDeleteFile,
+		Params: params,
+	})
+	if err != nil {
+		return fmt.Errorf("agent delete_file: %w", err)
+	}
+	if resp.Error != "" {
+		return fmt.Errorf("agent delete_file: %s", resp.Error)
+	}
+	return nil
+}
+
+func (p *FirecrackerProvider) MoveFile(ctx context.Context, sandboxID string, oldPath, newPath string) error {
+	vm, err := p.getVM(sandboxID)
+	if err != nil {
+		return err
+	}
+
+	params, _ := agentproto.MarshalParams(&agentproto.MoveFileParams{OldPath: oldPath, NewPath: newPath})
+	resp, err := vm.sendRequest(&agentproto.Request{
+		ID:     generateRequestID(),
+		Method: agentproto.MethodMoveFile,
+		Params: params,
+	})
+	if err != nil {
+		return fmt.Errorf("agent move_file: %w", err)
+	}
+	if resp.Error != "" {
+		return fmt.Errorf("agent move_file: %s", resp.Error)
+	}
+	return nil
+}
+
+func (p *FirecrackerProvider) ChmodFile(ctx context.Context, sandboxID string, path string, mode string) error {
+	vm, err := p.getVM(sandboxID)
+	if err != nil {
+		return err
+	}
+
+	params, _ := agentproto.MarshalParams(&agentproto.ChmodFileParams{Path: path, Mode: mode})
+	resp, err := vm.sendRequest(&agentproto.Request{
+		ID:     generateRequestID(),
+		Method: agentproto.MethodChmodFile,
+		Params: params,
+	})
+	if err != nil {
+		return fmt.Errorf("agent chmod_file: %w", err)
+	}
+	if resp.Error != "" {
+		return fmt.Errorf("agent chmod_file: %s", resp.Error)
+	}
+	return nil
+}
+
+func (p *FirecrackerProvider) StatFile(ctx context.Context, sandboxID string, path string) (*FileInfo, error) {
+	vm, err := p.getVM(sandboxID)
+	if err != nil {
+		return nil, err
+	}
+
+	params, _ := agentproto.MarshalParams(&agentproto.StatFileParams{Path: path})
+	resp, err := vm.sendRequest(&agentproto.Request{
+		ID:     generateRequestID(),
+		Method: agentproto.MethodStatFile,
+		Params: params,
+	})
+	if err != nil {
+		return nil, fmt.Errorf("agent stat_file: %w", err)
+	}
+	if resp.Error != "" {
+		return nil, fmt.Errorf("agent stat_file: %s", resp.Error)
+	}
+
+	var result agentproto.FileInfoResult
+	if err := agentproto.UnmarshalResult(resp.Result, &result); err != nil {
+		return nil, fmt.Errorf("unmarshal stat_file result: %w", err)
+	}
+
+	return &FileInfo{
+		Path:    result.Path,
+		Size:    result.Size,
+		Mode:    result.Mode,
+		IsDir:   result.IsDir,
+		ModTime: result.ModTime,
+	}, nil
+}
+
+func (p *FirecrackerProvider) GlobFiles(ctx context.Context, sandboxID string, pattern string) ([]string, error) {
+	vm, err := p.getVM(sandboxID)
+	if err != nil {
+		return nil, err
+	}
+
+	params, _ := agentproto.MarshalParams(&agentproto.GlobFilesParams{Pattern: pattern})
+	resp, err := vm.sendRequest(&agentproto.Request{
+		ID:     generateRequestID(),
+		Method: agentproto.MethodGlobFiles,
+		Params: params,
+	})
+	if err != nil {
+		return nil, fmt.Errorf("agent glob_files: %w", err)
+	}
+	if resp.Error != "" {
+		return nil, fmt.Errorf("agent glob_files: %s", resp.Error)
+	}
+
+	var result agentproto.GlobFilesResult
+	if err := agentproto.UnmarshalResult(resp.Result, &result); err != nil {
+		return nil, fmt.Errorf("unmarshal glob_files result: %w", err)
+	}
+
+	return result.Matches, nil
+}
+
 func (p *FirecrackerProvider) Status(ctx context.Context, sandboxID string) (*SandboxStatus, error) {
 	vm, err := p.getVM(sandboxID)
 	if err != nil {

@@ -25,14 +25,12 @@ import asyncio
 from pathlib import Path
 from datetime import datetime
 
-# Load .env from ACG_YODA
-env_path = Path("/home/adwitiya24/corporate/acg_yoda/backend/.env")
-if env_path.exists():
-    for line in env_path.read_text().splitlines():
-        line = line.strip()
-        if line and not line.startswith("#") and "=" in line:
-            key, _, value = line.partition("=")
-            os.environ.setdefault(key.strip(), value.strip())
+# Load .env if dotenv is available
+try:
+    from dotenv import load_dotenv
+    load_dotenv()
+except ImportError:
+    pass
 
 from forgevm import Client
 
@@ -42,7 +40,7 @@ REQUESTY_API_KEY = os.environ.get("REQUESTY_API_KEY")
 MODEL = os.environ.get("LLM_MODEL", "anthropic/claude-haiku-4-5")
 FORGEVM_URL = os.environ.get("FORGEVM_URL", "http://localhost:7423")
 SANDBOX_IMAGE = os.environ.get("SANDBOX_IMAGE", "ghcr.io/darkxace01/ai-filegen-sandbox:py3.12-v1")
-OUTPUT_DIR = Path(os.environ.get("LLM_OUTPUT_DIR", "/home/adwitiya24/sandbox_files"))
+OUTPUT_DIR = Path(os.environ.get("LLM_OUTPUT_DIR", "./sandbox_files"))
 BINARY_EXTENSIONS = {".pdf", ".docx", ".xlsx", ".png", ".jpg", ".jpeg", ".gif", ".zip"}
 
 IS_ANTHROPIC = MODEL.startswith("anthropic/")

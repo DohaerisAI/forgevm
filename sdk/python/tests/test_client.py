@@ -83,6 +83,68 @@ class TestFiles:
         assert any("b.txt" in n for n in names)
 
 
+class TestExtendedFileOps:
+    def test_delete_file(self, sandbox):
+        sandbox.write_file("/workspace/to_delete.txt", "bye")
+        content = sandbox.read_file("/workspace/to_delete.txt")
+        assert content == "bye"
+        sandbox.delete_file("/workspace/to_delete.txt")
+        # File should no longer exist
+        with pytest.raises(Exception):
+            sandbox.read_file("/workspace/to_delete.txt")
+
+    def test_delete_file_recursive(self, sandbox):
+        sandbox.write_file("/workspace/subdir/nested.txt", "nested")
+        sandbox.delete_file("/workspace/subdir", recursive=True)
+        with pytest.raises(Exception):
+            sandbox.read_file("/workspace/subdir/nested.txt")
+
+    def test_move_file(self, sandbox):
+        sandbox.write_file("/workspace/original.txt", "move me")
+        sandbox.move_file("/workspace/original.txt", "/workspace/moved.txt")
+        content = sandbox.read_file("/workspace/moved.txt")
+        assert content == "move me"
+        with pytest.raises(Exception):
+            sandbox.read_file("/workspace/original.txt")
+
+    def test_chmod_file(self, sandbox):
+        sandbox.write_file("/workspace/script.sh", "#!/bin/sh\necho hi")
+        sandbox.chmod_file("/workspace/script.sh", "0755")
+        info = sandbox.stat_file("/workspace/script.sh")
+        assert info is not None
+
+    def test_stat_file(self, sandbox):
+        sandbox.write_file("/workspace/stat_test.txt", "hello world")
+        info = sandbox.stat_file("/workspace/stat_test.txt")
+        assert info["size"] == 11
+        assert info["is_dir"] is False
+
+    def test_glob_files(self, sandbox):
+        sandbox.write_file("/workspace/a.log", "log a")
+        sandbox.write_file("/workspace/b.log", "log b")
+        sandbox.write_file("/workspace/c.txt", "text c")
+        matches = sandbox.glob_files("/workspace/*.log")
+        assert len(matches) == 2
+        assert any("a.log" in m for m in matches)
+        assert any("b.log" in m for m in matches)
+
+
+class TestPoolStatus:
+    def test_pool_status(self, client):
+        status = client.pool_status()
+        assert "enabled" in status
+
+
+class TestUserID:
+    def test_spawn_with_user_id(self):
+        with Client(base_url=SERVER_URL, user_id="testuser") as c:
+            sb = c.spawn(image="alpine:latest")
+            try:
+                assert sb.id.startswith("sb-")
+            finally:
+                sb.destroy()
+
+
 class TestContextManager:
     def test_sandbox_context(self, client):
         with client.spawn(image="alpine:latest") as sb:

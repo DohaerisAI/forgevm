@@ -16,6 +16,7 @@ import type {
   ProviderInfo,
   SandboxInfo,
   SpawnOptions,
+  VMPoolStatus,
 } from "./types.js";
 
 /**
@@ -128,6 +129,9 @@ export class Client {
     this._headers = {};
     if (opts.apiKey) {
       this._headers["X-API-Key"] = opts.apiKey;
+    }
+    if (opts.userId) {
+      this._headers["X-User-ID"] = opts.userId;
     }
 
     this.templates = new TemplateManager(
@@ -298,6 +302,21 @@ export class Client {
 
     await handleResponse(response);
     return (await response.json()) as ProviderInfo[];
+  }
+
+  /**
+   * Get the current VM pool status.
+   *
+   * @returns Pool status information, or `{ enabled: false }` if pool mode
+   *   is not active.
+   */
+  async poolStatus(): Promise<VMPoolStatus> {
+    const response = await this._fetch("/api/v1/pool/status", {
+      method: "GET",
+    });
+
+    await handleResponse(response);
+    return (await response.json()) as VMPoolStatus;
   }
 
   // -----------------------------------------------------------------------

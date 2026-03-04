@@ -136,4 +136,13 @@ CREATE INDEX IF NOT EXISTS idx_registry_connections_owner ON registry_connection
 CREATE INDEX IF NOT EXISTS idx_registry_connections_provider ON registry_connections(provider);
 `,
 	},
+	{
+		version: 4,
+		sql: `
+ALTER TABLE sandboxes ADD COLUMN owner_id TEXT NOT NULL DEFAULT '';
+ALTER TABLE sandboxes ADD COLUMN vm_id TEXT NOT NULL DEFAULT '';
+CREATE INDEX IF NOT EXISTS idx_sandboxes_owner ON sandboxes(owner_id);
+CREATE INDEX IF NOT EXISTS idx_sandboxes_vm ON sandboxes(vm_id);
+`,
+	},
 }
