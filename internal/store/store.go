@@ -13,6 +13,8 @@ type SandboxRecord struct {
 	MemoryMB  int
 	VCPUs     int
 	Metadata  string // JSON
+	OwnerID   string
+	VMID      string
 	CreatedAt time.Time
 	ExpiresAt time.Time
 	UpdatedAt time.Time
@@ -112,6 +114,8 @@ type Store interface {
 	UpdateSandboxExpiresAt(ctx context.Context, id string, expiresAt time.Time) error
 	DeleteSandbox(ctx context.Context, id string) error
 	ListExpiredSandboxes(ctx context.Context, before time.Time) ([]*SandboxRecord, error)
+	ListSandboxesByOwner(ctx context.Context, ownerID string) ([]*SandboxRecord, error)
+	CountSandboxesByVM(ctx context.Context, vmID string) (int, error)
 
 	// Exec logs
 	CreateExecLog(ctx context.Context, log *ExecLogRecord) error

@@ -19,6 +19,8 @@ type Sandbox struct {
 	Image     string       `json:"image"`
 	MemoryMB  int          `json:"memory_mb"`
 	VCPUs     int          `json:"vcpus"`
+	OwnerID   string       `json:"owner_id,omitempty"`
+	VMID      string       `json:"vm_id,omitempty"`
 	CreatedAt time.Time    `json:"created_at"`
 	ExpiresAt time.Time    `json:"expires_at"`
 	Metadata  map[string]string `json:"metadata,omitempty"`
@@ -31,6 +33,7 @@ type SpawnRequest struct {
 	VCPUs    int               `json:"vcpus,omitempty"`
 	TTL      string            `json:"ttl,omitempty"`
 	Template string            `json:"template,omitempty"`
+	OwnerID  string            `json:"owner_id,omitempty"`
 	Metadata map[string]string `json:"metadata,omitempty"`
 }
 
@@ -62,6 +65,21 @@ type FileInfo struct {
 	Mode    string `json:"mode"`
 	IsDir   bool   `json:"is_dir"`
 	ModTime string `json:"mod_time"`
+}
+
+type FileDeleteRequest struct {
+	Path      string `json:"path"`
+	Recursive bool   `json:"recursive"`
+}
+
+type FileMoveRequest struct {
+	OldPath string `json:"old_path"`
+	NewPath string `json:"new_path"`
+}
+
+type FileChmodRequest struct {
+	Path string `json:"path"`
+	Mode string `json:"mode"`
 }
 
 type SandboxInfo struct {

@@ -25,16 +25,12 @@ import os
 import sys
 import time
 import asyncio
-from pathlib import Path
-
-# Load .env from ACG_YODA
-env_path = Path("/home/adwitiya24/corporate/acg_yoda/backend/.env")
-if env_path.exists():
-    for line in env_path.read_text().splitlines():
-        line = line.strip()
-        if line and not line.startswith("#") and "=" in line:
-            key, _, value = line.partition("=")
-            os.environ.setdefault(key.strip(), value.strip())
+# Load .env if dotenv is available
+try:
+    from dotenv import load_dotenv
+    load_dotenv()
+except ImportError:
+    pass
 
 from forgevm import Client
 

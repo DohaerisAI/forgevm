@@ -315,6 +315,94 @@ func (p *CustomProvider) ListFiles(ctx context.Context, sandboxID string, path s
 	return files, nil
 }
 
+func (p *CustomProvider) DeleteFile(ctx context.Context, sandboxID string, path string, recursive bool) error {
+	body := map[string]interface{}{
+		"sandbox_id": sandboxID,
+		"path":       path,
+		"recursive":  recursive,
+	}
+	data, code, err := p.doRequest(ctx, "DELETE", "/files", body)
+	if err != nil {
+		return fmt.Errorf("custom delete: %w", err)
+	}
+	if code >= 400 {
+		return fmt.Errorf("custom delete failed (HTTP %d): %s", code, string(data))
+	}
+	return nil
+}
+
+func (p *CustomProvider) MoveFile(ctx context.Context, sandboxID string, oldPath, newPath string) error {
+	body := map[string]interface{}{
+		"sandbox_id": sandboxID,
+		"old_path":   oldPath,
+		"new_path":   newPath,
+	}
+	data, code, err := p.doRequest(ctx, "POST", "/files/move", body)
+	if err != nil {
+		return fmt.Errorf("custom move: %w", err)
+	}
+	if code >= 400 {
+		return fmt.Errorf("custom move failed (HTTP %d): %s", code, string(data))
+	}
+	return nil
+}
+
+func (p *CustomProvider) ChmodFile(ctx context.Context, sandboxID string, path string, mode string) error {
+	body := map[string]interface{}{
+		"sandbox_id": sandboxID,
+		"path":       path,
+		"mode":       mode,
+	}
+	data, code, err := p.doRequest(ctx, "POST", "/files/chmod", body)
+	if err != nil {
+		return fmt.Errorf("custom chmod: %w", err)
+	}
+	if code >= 400 {
+		return fmt.Errorf("custom chmod failed (HTTP %d): %s", code, string(data))
+	}
+	return nil
+}
+
+func (p *CustomProvider) StatFile(ctx context.Context, sandboxID string, path string) (*FileInfo, error) {
+	params := url.Values{}
+	params.Set("sandbox_id", sandboxID)
+	params.Set("path", path)
+
+	data, code, err := p.doRequest(ctx, "GET", "/files/stat?"+params.Encode(), nil)
+	if err != nil {
+		return nil, fmt.Errorf("custom stat: %w", err)
+	}
+	if code >= 400 {
+		return nil, fmt.Errorf("custom stat failed (HTTP %d): %s", code, string(data))
+	}
+
+	var fi FileInfo
+	if err := json.Unmarshal(data, &fi); err != nil {
+		return nil, fmt.Errorf("custom stat: invalid response: %w", err)
+	}
+	return &fi, nil
+}
+
+func (p *CustomProvider) GlobFiles(ctx context.Context, sandboxID string, pattern string) ([]string, error) {
+	params := url.Values{}
+	params.Set("sandbox_id", sandboxID)
+	params.Set("pattern", pattern)
+
+	data, code, err := p.doRequest(ctx, "GET", "/files/glob?"+params.Encode(), nil)
+	if err != nil {
+		return nil, fmt.Errorf("custom glob: %w", err)
+	}
+	if code >= 400 {
+		return nil, fmt.Errorf("custom glob failed (HTTP %d): %s", code, string(data))
+	}
+
+	var matches []string
+	if err := json.Unmarshal(data, &matches); err != nil {
+		return nil, fmt.Errorf("custom glob: invalid response: %w", err)
+	}
+	return matches, nil
+}
+
 // Status returns the current status of a sandbox.
 // GET /status/:id
 func (p *CustomProvider) Status(ctx context.Context, sandboxID string) (*SandboxStatus, error) {

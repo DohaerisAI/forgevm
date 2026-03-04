@@ -140,6 +140,16 @@ func handleConn(conn net.Conn) {
 			handleReadFile(w, req)
 		case agentproto.MethodListFiles:
 			handleListFiles(w, req)
+		case agentproto.MethodDeleteFile:
+			handleDeleteFile(w, req)
+		case agentproto.MethodMoveFile:
+			handleMoveFile(w, req)
+		case agentproto.MethodChmodFile:
+			handleChmodFile(w, req)
+		case agentproto.MethodStatFile:
+			handleStatFile(w, req)
+		case agentproto.MethodGlobFiles:
+			handleGlobFiles(w, req)
 		case agentproto.MethodShutdown:
 			handleShutdown(w, req)
 		default:
@@ -355,6 +365,114 @@ func handleListFiles(w io.Writer, req *agentproto.Request) {
 	}
 
 	result, _ := agentproto.MarshalResult(&agentproto.ListFilesResult{Files: files})
+	agentproto.SendResponse(w, &agentproto.Response{ID: req.ID, Result: result})
+}
+
+func handleDeleteFile(w io.Writer, req *agentproto.Request) {
+	var params agentproto.DeleteFileParams
+	if err := agentproto.UnmarshalParams(req.Params, &params); err != nil {
+		sendError(w, req.ID, fmt.Sprintf("bad params: %v", err))
+		return
+	}
+
+	var err error
+	if params.Recursive {
+		err = os.RemoveAll(params.Path)
+	} else {
+		err = os.Remove(params.Path)
+	}
+	if err != nil {
+		sendError(w, req.ID, fmt.Sprintf("delete: %v", err))
+		return
+	}
+
+	result, _ := agentproto.MarshalResult(map[string]bool{"ok": true})
+	agentproto.SendResponse(w, &agentproto.Response{ID: req.ID, Result: result})
+}
+
+func handleMoveFile(w io.Writer, req *agentproto.Request) {
+	var params agentproto.MoveFileParams
+	if err := agentproto.UnmarshalParams(req.Params, &params); err != nil {
+		sendError(w, req.ID, fmt.Sprintf("bad params: %v", err))
+		return
+	}
+
+	if err := os.MkdirAll(filepath.Dir(params.NewPath), 0755); err != nil {
+		sendError(w, req.ID, fmt.Sprintf("mkdir: %v", err))
+		return
+	}
+
+	if err := os.Rename(params.OldPath, params.NewPath); err != nil {
+		sendError(w, req.ID, fmt.Sprintf("rename: %v", err))
+		return
+	}
+
+	result, _ := agentproto.MarshalResult(map[string]bool{"ok": true})
+	agentproto.SendResponse(w, &agentproto.Response{ID: req.ID, Result: result})
+}
+
+func handleChmodFile(w io.Writer, req *agentproto.Request) {
+	var params agentproto.ChmodFileParams
+	if err := agentproto.UnmarshalParams(req.Params, &params); err != nil {
+		sendError(w, req.ID, fmt.Sprintf("bad params: %v", err))
+		return
+	}
+
+	mode, err := strconv.ParseUint(params.Mode, 8, 32)
+	if err != nil {
+		sendError(w, req.ID, fmt.Sprintf("parse mode: %v", err))
+		return
+	}
+
+	if err := os.Chmod(params.Path, os.FileMode(mode)); err != nil {
+		sendError(w, req.ID, fmt.Sprintf("chmod: %v", err))
+		return
+	}
+
+	result, _ := agentproto.MarshalResult(map[string]bool{"ok": true})
+	agentproto.SendResponse(w, &agentproto.Response{ID: req.ID, Result: result})
+}
+
+func handleStatFile(w io.Writer, req *agentproto.Request) {
+	var params agentproto.StatFileParams
+	if err := agentproto.UnmarshalParams(req.Params, &params); err != nil {
+		sendError(w, req.ID, fmt.Sprintf("bad params: %v", err))
+		return
+	}
+
+	info, err := os.Stat(params.Path)
+	if err != nil {
+		sendError(w, req.ID, fmt.Sprintf("stat: %v", err))
+		return
+	}
+
+	result, _ := agentproto.MarshalResult(&agentproto.FileInfoResult{
+		Path:    params.Path,
+		Size:    info.Size(),
+		Mode:    fmt.Sprintf("%o", info.Mode()),
+		IsDir:   info.IsDir(),
+		ModTime: info.ModTime().UTC().Format(time.RFC3339),
+	})
+	agentproto.SendResponse(w, &agentproto.Response{ID: req.ID, Result: result})
+}
+
+func handleGlobFiles(w io.Writer, req *agentproto.Request) {
+	var params agentproto.GlobFilesParams
+	if err := agentproto.UnmarshalParams(req.Params, &params); err != nil {
+		sendError(w, req.ID, fmt.Sprintf("bad params: %v", err))
+		return
+	}
+
+	matches, err := filepath.Glob(params.Pattern)
+	if err != nil {
+		sendError(w, req.ID, fmt.Sprintf("glob: %v", err))
+		return
+	}
+	if matches == nil {
+		matches = []string{}
+	}
+
+	result, _ := agentproto.MarshalResult(&agentproto.GlobFilesResult{Matches: matches})
 	agentproto.SendResponse(w, &agentproto.Response{ID: req.ID, Result: result})
 }
 

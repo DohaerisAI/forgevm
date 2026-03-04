@@ -9,6 +9,7 @@ import (
 	"os"
 	"os/exec"
 	"path/filepath"
+	"strconv"
 	"strings"
 	"sync"
 )
@@ -258,6 +259,94 @@ func (m *MockProvider) ListFiles(ctx context.Context, sandboxID string, path str
 		})
 	}
 	return files, nil
+}
+
+func (m *MockProvider) DeleteFile(ctx context.Context, sandboxID string, path string, recursive bool) error {
+	sb, err := m.getSandbox(sandboxID)
+	if err != nil {
+		return err
+	}
+
+	fullPath := filepath.Join(sb.root, filepath.Clean(path))
+	if recursive {
+		return os.RemoveAll(fullPath)
+	}
+	return os.Remove(fullPath)
+}
+
+func (m *MockProvider) MoveFile(ctx context.Context, sandboxID string, oldPath, newPath string) error {
+	sb, err := m.getSandbox(sandboxID)
+	if err != nil {
+		return err
+	}
+
+	fullOld := filepath.Join(sb.root, filepath.Clean(oldPath))
+	fullNew := filepath.Join(sb.root, filepath.Clean(newPath))
+
+	if err := os.MkdirAll(filepath.Dir(fullNew), 0755); err != nil {
+		return fmt.Errorf("creating dirs: %w", err)
+	}
+
+	return os.Rename(fullOld, fullNew)
+}
+
+func (m *MockProvider) ChmodFile(ctx context.Context, sandboxID string, path string, mode string) error {
+	sb, err := m.getSandbox(sandboxID)
+	if err != nil {
+		return err
+	}
+
+	fullPath := filepath.Join(sb.root, filepath.Clean(path))
+
+	parsed, err := strconv.ParseUint(mode, 8, 32)
+	if err != nil {
+		return fmt.Errorf("parse mode: %w", err)
+	}
+
+	return os.Chmod(fullPath, os.FileMode(parsed))
+}
+
+func (m *MockProvider) StatFile(ctx context.Context, sandboxID string, path string) (*FileInfo, error) {
+	sb, err := m.getSandbox(sandboxID)
+	if err != nil {
+		return nil, err
+	}
+
+	fullPath := filepath.Join(sb.root, filepath.Clean(path))
+	info, err := os.Stat(fullPath)
+	if err != nil {
+		return nil, fmt.Errorf("stat: %w", err)
+	}
+
+	return &FileInfo{
+		Path:    path,
+		Size:    info.Size(),
+		Mode:    fmt.Sprintf("%o", info.Mode()),
+		IsDir:   info.IsDir(),
+		ModTime: info.ModTime().UTC().Format("2006-01-02T15:04:05Z"),
+	}, nil
+}
+
+func (m *MockProvider) GlobFiles(ctx context.Context, sandboxID string, pattern string) ([]string, error) {
+	sb, err := m.getSandbox(sandboxID)
+	if err != nil {
+		return nil, err
+	}
+
+	fullPattern := filepath.Join(sb.root, filepath.Clean(pattern))
+	matches, err := filepath.Glob(fullPattern)
+	if err != nil {
+		return nil, fmt.Errorf("glob: %w", err)
+	}
+
+	// Strip sandbox root prefix to return sandbox-relative paths
+	result := make([]string, len(matches))
+	for i, match := range matches {
+		rel, _ := filepath.Rel(sb.root, match)
+		result[i] = "/" + rel
+	}
+
+	return result, nil
 }
 
 func (m *MockProvider) Status(ctx context.Context, sandboxID string) (*SandboxStatus, error) {

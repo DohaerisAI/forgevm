@@ -24,11 +24,14 @@ class AsyncClient:
         self,
         base_url: str = "http://localhost:7423",
         api_key: str | None = None,
+        user_id: str | None = None,
         timeout: float = 30.0,
     ):
         headers = {}
         if api_key:
             headers["X-API-Key"] = api_key
+        if user_id:
+            headers["X-User-ID"] = user_id
 
         self._http = httpx.AsyncClient(
             base_url=base_url,
@@ -112,6 +115,12 @@ class AsyncClient:
         resp = await self._http.delete("/api/v1/sandboxes")
         handle_response(resp)
         return resp.json().get("pruned", 0)
+
+    async def pool_status(self) -> dict:
+        """Get VM pool status."""
+        resp = await self._http.get("/api/v1/pool/status")
+        handle_response(resp)
+        return resp.json()
 
     async def health(self) -> dict:
         """Check server health."""
