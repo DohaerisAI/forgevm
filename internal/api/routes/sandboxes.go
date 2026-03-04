@@ -35,7 +35,12 @@ func (s *SandboxRoutes) Routes() chi.Router {
 		r.Get("/exec/ws", s.ExecWebSocket)
 		r.Post("/files", s.WriteFile)
 		r.Get("/files", s.ReadFile)
+		r.Delete("/files", s.DeleteFile)
 		r.Get("/files/list", s.ListFiles)
+		r.Post("/files/move", s.MoveFile)
+		r.Post("/files/chmod", s.ChmodFile)
+		r.Get("/files/stat", s.StatFile)
+		r.Get("/files/glob", s.GlobFiles)
 		r.Get("/logs", s.ConsoleLog)
 	})
 	return r
@@ -59,6 +64,11 @@ func (s *SandboxRoutes) Create(w http.ResponseWriter, r *http.Request) {
 	if err := json.NewDecoder(r.Body).Decode(&req); err != nil {
 		httputil.WriteError(w, http.StatusBadRequest, httputil.CodeBadRequest, "invalid request body")
 		return
+	}
+
+	// Extract owner from X-User-ID header if present.
+	if userID := r.Header.Get("X-User-ID"); userID != "" {
+		req.OwnerID = userID
 	}
 
 	sb, err := s.manager.Spawn(r.Context(), req)
@@ -359,6 +369,126 @@ func (s *SandboxRoutes) ListFiles(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 	httputil.WriteJSON(w, http.StatusOK, files)
+}
+
+// DeleteFile deletes a file from a sandbox.
+func (s *SandboxRoutes) DeleteFile(w http.ResponseWriter, r *http.Request) {
+	id := chi.URLParam(r, "sandboxID")
+	path := r.URL.Query().Get("path")
+	if path == "" {
+		httputil.WriteError(w, http.StatusBadRequest, httputil.CodeBadRequest, "path query parameter required")
+		return
+	}
+
+	recursive := r.URL.Query().Get("recursive") == "true"
+
+	if err := s.manager.DeleteFile(r.Context(), id, orchestrator.FileDeleteRequest{
+		Path:      path,
+		Recursive: recursive,
+	}); err != nil {
+		if strings.Contains(err.Error(), "not found") {
+			httputil.WriteError(w, http.StatusNotFound, httputil.CodeNotFound, err.Error())
+			return
+		}
+		httputil.WriteError(w, http.StatusInternalServerError, httputil.CodeInternal, err.Error())
+		return
+	}
+	httputil.WriteJSON(w, http.StatusOK, map[string]string{"status": "deleted"})
+}
+
+// MoveFile moves/renames a file in a sandbox.
+func (s *SandboxRoutes) MoveFile(w http.ResponseWriter, r *http.Request) {
+	id := chi.URLParam(r, "sandboxID")
+	var req orchestrator.FileMoveRequest
+	if err := json.NewDecoder(r.Body).Decode(&req); err != nil {
+		httputil.WriteError(w, http.StatusBadRequest, httputil.CodeBadRequest, "invalid request body")
+		return
+	}
+
+	if err := s.manager.MoveFile(r.Context(), id, req); err != nil {
+		if strings.Contains(err.Error(), "not found") {
+			httputil.WriteError(w, http.StatusNotFound, httputil.CodeNotFound, err.Error())
+			return
+		}
+		httputil.WriteError(w, http.StatusInternalServerError, httputil.CodeInternal, err.Error())
+		return
+	}
+	httputil.WriteJSON(w, http.StatusOK, map[string]string{"status": "moved"})
+}
+
+// ChmodFile changes file permissions in a sandbox.
+func (s *SandboxRoutes) ChmodFile(w http.ResponseWriter, r *http.Request) {
+	id := chi.URLParam(r, "sandboxID")
+	var req orchestrator.FileChmodRequest
+	if err := json.NewDecoder(r.Body).Decode(&req); err != nil {
+		httputil.WriteError(w, http.StatusBadRequest, httputil.CodeBadRequest, "invalid request body")
+		return
+	}
+
+	if err := s.manager.ChmodFile(r.Context(), id, req); err != nil {
+		if strings.Contains(err.Error(), "not found") {
+			httputil.WriteError(w, http.StatusNotFound, httputil.CodeNotFound, err.Error())
+			return
+		}
+		httputil.WriteError(w, http.StatusInternalServerError, httputil.CodeInternal, err.Error())
+		return
+	}
+	httputil.WriteJSON(w, http.StatusOK, map[string]string{"status": "chmod applied"})
+}
+
+// StatFile returns file info for a single file in a sandbox.
+func (s *SandboxRoutes) StatFile(w http.ResponseWriter, r *http.Request) {
+	id := chi.URLParam(r, "sandboxID")
+	path := r.URL.Query().Get("path")
+	if path == "" {
+		httputil.WriteError(w, http.StatusBadRequest, httputil.CodeBadRequest, "path query parameter required")
+		return
+	}
+
+	fi, err := s.manager.StatFile(r.Context(), id, path)
+	if err != nil {
+		if strings.Contains(err.Error(), "not found") {
+			httputil.WriteError(w, http.StatusNotFound, httputil.CodeNotFound, err.Error())
+			return
+		}
+		httputil.WriteError(w, http.StatusInternalServerError, httputil.CodeInternal, err.Error())
+		return
+	}
+	httputil.WriteJSON(w, http.StatusOK, fi)
+}
+
+// GlobFiles returns paths matching a glob pattern in a sandbox.
+func (s *SandboxRoutes) GlobFiles(w http.ResponseWriter, r *http.Request) {
+	id := chi.URLParam(r, "sandboxID")
+	pattern := r.URL.Query().Get("pattern")
+	if pattern == "" {
+		httputil.WriteError(w, http.StatusBadRequest, httputil.CodeBadRequest, "pattern query parameter required")
+		return
+	}
+
+	matches, err := s.manager.GlobFiles(r.Context(), id, pattern)
+	if err != nil {
+		if strings.Contains(err.Error(), "not found") {
+			httputil.WriteError(w, http.StatusNotFound, httputil.CodeNotFound, err.Error())
+			return
+		}
+		httputil.WriteError(w, http.StatusInternalServerError, httputil.CodeInternal, err.Error())
+		return
+	}
+	httputil.WriteJSON(w, http.StatusOK, matches)
+}
+
+// PoolStatusResponse is returned by the pool status endpoint.
+type PoolStatusResponse = orchestrator.VMPoolStatus
+
+// VMPoolStatusHandler returns the VM pool status.
+func (s *SandboxRoutes) VMPoolStatus(w http.ResponseWriter, r *http.Request) {
+	status := s.manager.VMPoolStatus()
+	if status == nil {
+		httputil.WriteJSON(w, http.StatusOK, map[string]bool{"enabled": false})
+		return
+	}
+	httputil.WriteJSON(w, http.StatusOK, status)
 }
 
 // Prune destroys all expired sandboxes.

@@ -100,6 +100,46 @@ class Sandbox:
         handle_response(resp)
         return resp.json()
 
+    def delete_file(self, path: str, recursive: bool = False) -> None:
+        """Delete a file or directory from the sandbox."""
+        params = {"path": path}
+        if recursive:
+            params["recursive"] = "true"
+        resp = self._http.delete(f"/api/v1/sandboxes/{self.id}/files", params=params)
+        handle_response(resp)
+
+    def move_file(self, old_path: str, new_path: str) -> None:
+        """Move/rename a file in the sandbox."""
+        resp = self._http.post(
+            f"/api/v1/sandboxes/{self.id}/files/move",
+            json={"old_path": old_path, "new_path": new_path},
+        )
+        handle_response(resp)
+
+    def chmod_file(self, path: str, mode: str) -> None:
+        """Change file permissions in the sandbox."""
+        resp = self._http.post(
+            f"/api/v1/sandboxes/{self.id}/files/chmod",
+            json={"path": path, "mode": mode},
+        )
+        handle_response(resp)
+
+    def stat_file(self, path: str) -> dict:
+        """Get file info for a single file in the sandbox."""
+        resp = self._http.get(
+            f"/api/v1/sandboxes/{self.id}/files/stat", params={"path": path}
+        )
+        handle_response(resp)
+        return resp.json()
+
+    def glob_files(self, pattern: str) -> list[str]:
+        """Return paths matching a glob pattern in the sandbox."""
+        resp = self._http.get(
+            f"/api/v1/sandboxes/{self.id}/files/glob", params={"pattern": pattern}
+        )
+        handle_response(resp)
+        return resp.json()
+
     def extend_ttl(self, ttl: str = "30m") -> None:
         """Extend this sandbox's TTL by the given duration."""
         resp = self._http.post(f"/api/v1/sandboxes/{self.id}/extend", json={"ttl": ttl})

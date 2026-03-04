@@ -103,8 +103,10 @@ func runServe() error {
 		DefaultImage:  cfg.Defaults.Image,
 		DefaultMemory: cfg.Defaults.MemoryMB,
 		DefaultVCPUs:  cfg.Defaults.VCPUs,
+		Pool:          cfg.Pool,
 	})
 	mgr.Start()
+	mgr.InitVMPool()
 	defer mgr.Stop()
 
 	// Template registry
