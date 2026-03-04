@@ -69,4 +69,71 @@ CREATE TABLE IF NOT EXISTS templates (
 ALTER TABLE sandboxes ADD COLUMN template TEXT NOT NULL DEFAULT '';
 `,
 	},
+	{
+		version: 3,
+		sql: `
+CREATE TABLE IF NOT EXISTS environment_specs (
+    id               TEXT PRIMARY KEY,
+    owner_id         TEXT NOT NULL,
+    name             TEXT NOT NULL,
+    base_image       TEXT NOT NULL,
+    python_packages  TEXT NOT NULL DEFAULT '[]',
+    apt_packages     TEXT NOT NULL DEFAULT '[]',
+    python_version   TEXT NOT NULL DEFAULT '',
+    created_at       DATETIME NOT NULL DEFAULT (datetime('now')),
+    updated_at       DATETIME NOT NULL DEFAULT (datetime('now')),
+    UNIQUE(owner_id, name)
+);
+
+CREATE INDEX IF NOT EXISTS idx_environment_specs_owner ON environment_specs(owner_id);
+
+CREATE TABLE IF NOT EXISTS environment_builds (
+    id               TEXT PRIMARY KEY,
+    spec_id          TEXT NOT NULL REFERENCES environment_specs(id),
+    status           TEXT NOT NULL DEFAULT 'queued',
+    current_step     TEXT NOT NULL DEFAULT '',
+    log_blob         TEXT NOT NULL DEFAULT '',
+    image_size_bytes INTEGER NOT NULL DEFAULT 0,
+    digest_local     TEXT NOT NULL DEFAULT '',
+    error            TEXT NOT NULL DEFAULT '',
+    created_at       DATETIME NOT NULL DEFAULT (datetime('now')),
+    finished_at      DATETIME,
+    updated_at       DATETIME NOT NULL DEFAULT (datetime('now'))
+);
+
+CREATE INDEX IF NOT EXISTS idx_environment_builds_spec ON environment_builds(spec_id);
+CREATE INDEX IF NOT EXISTS idx_environment_builds_status ON environment_builds(status);
+
+CREATE TABLE IF NOT EXISTS environment_artifacts (
+    id               INTEGER PRIMARY KEY AUTOINCREMENT,
+    build_id         TEXT NOT NULL REFERENCES environment_builds(id),
+    target           TEXT NOT NULL,
+    image_ref        TEXT NOT NULL,
+    digest           TEXT NOT NULL DEFAULT '',
+    status           TEXT NOT NULL DEFAULT 'pending',
+    error            TEXT NOT NULL DEFAULT '',
+    created_at       DATETIME NOT NULL DEFAULT (datetime('now')),
+    updated_at       DATETIME NOT NULL DEFAULT (datetime('now')),
+    UNIQUE(build_id, target)
+);
+
+CREATE INDEX IF NOT EXISTS idx_environment_artifacts_build ON environment_artifacts(build_id);
+CREATE INDEX IF NOT EXISTS idx_environment_artifacts_target ON environment_artifacts(target);
+
+CREATE TABLE IF NOT EXISTS registry_connections (
+    id               TEXT PRIMARY KEY,
+    owner_id         TEXT NOT NULL,
+    provider         TEXT NOT NULL,
+    username         TEXT NOT NULL,
+    secret_ref       TEXT NOT NULL,
+    is_default       BOOLEAN NOT NULL DEFAULT 0,
+    created_at       DATETIME NOT NULL DEFAULT (datetime('now')),
+    updated_at       DATETIME NOT NULL DEFAULT (datetime('now')),
+    UNIQUE(owner_id, provider, username)
+);
+
+CREATE INDEX IF NOT EXISTS idx_registry_connections_owner ON registry_connections(owner_id);
+CREATE INDEX IF NOT EXISTS idx_registry_connections_provider ON registry_connections(provider);
+`,
+	},
 }

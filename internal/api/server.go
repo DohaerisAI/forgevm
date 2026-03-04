@@ -5,12 +5,13 @@ import (
 	"net/http"
 	"time"
 
-	"github.com/go-chi/chi/v5"
-	chimw "github.com/go-chi/chi/v5/middleware"
 	"github.com/DohaerisAI/forgevm/internal/api/middleware"
 	"github.com/DohaerisAI/forgevm/internal/api/routes"
 	"github.com/DohaerisAI/forgevm/internal/orchestrator"
 	"github.com/DohaerisAI/forgevm/internal/providers"
+	"github.com/DohaerisAI/forgevm/internal/store"
+	"github.com/go-chi/chi/v5"
+	chimw "github.com/go-chi/chi/v5/middleware"
 	"github.com/rs/zerolog"
 	httpSwagger "github.com/swaggo/http-swagger/v2"
 
@@ -39,7 +40,7 @@ type Server struct {
 //	@in							header
 //	@name						X-API-Key
 
-func NewServer(cfg ServerConfig, registry *providers.Registry, manager *orchestrator.Manager, events *orchestrator.EventBus, templates *orchestrator.TemplateRegistry, pool *orchestrator.PoolManager, logger zerolog.Logger) *Server {
+func NewServer(cfg ServerConfig, registry *providers.Registry, manager *orchestrator.Manager, events *orchestrator.EventBus, templates *orchestrator.TemplateRegistry, pool *orchestrator.PoolManager, st store.Store, envBuild routes.BuildStarter, logger zerolog.Logger) *Server {
 	r := chi.NewRouter()
 
 	// Global middleware (applies to all routes including swagger)
@@ -79,12 +80,14 @@ func NewServer(cfg ServerConfig, registry *providers.Registry, manager *orchestr
 		templateRoutes := routes.NewTemplateRoutes(templates, manager)
 		snapshotRoutes := routes.NewSnapshotRoutes(registry)
 		systemRoutes := routes.NewSystemRoutes(registry, manager, events, cfg.Version)
+		environmentRoutes := routes.NewEnvironmentRoutes(st, envBuild)
 
 		r.Route("/api/v1", func(r chi.Router) {
 			r.Mount("/sandboxes", sandboxRoutes.Routes())
 			r.Mount("/providers", providerRoutes.Routes())
 			r.Mount("/templates", templateRoutes.Routes())
 			r.Mount("/snapshots", snapshotRoutes.Routes())
+			r.Mount("/environments", environmentRoutes.Routes())
 			r.Mount("/", systemRoutes.Routes())
 		})
 	})

@@ -328,6 +328,291 @@ func (s *SQLiteStore) DeleteTemplate(ctx context.Context, name string) error {
 	return nil
 }
 
+// --- Environment Specs ---
+
+func (s *SQLiteStore) CreateEnvironmentSpec(ctx context.Context, spec *EnvironmentSpecRecord) error {
+	_, err := s.db.ExecContext(ctx, `
+		INSERT INTO environment_specs (id, owner_id, name, base_image, python_packages, apt_packages, python_version, created_at, updated_at)
+		VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)`,
+		spec.ID, spec.OwnerID, spec.Name, spec.BaseImage, spec.PythonPackages, spec.AptPackages, spec.PythonVersion,
+		spec.CreatedAt.UTC(), spec.UpdatedAt.UTC(),
+	)
+	return err
+}
+
+func (s *SQLiteStore) GetEnvironmentSpec(ctx context.Context, id string) (*EnvironmentSpecRecord, error) {
+	spec := &EnvironmentSpecRecord{}
+	err := s.db.QueryRowContext(ctx, `
+		SELECT id, owner_id, name, base_image, python_packages, apt_packages, python_version, created_at, updated_at
+		FROM environment_specs WHERE id = ?`, id,
+	).Scan(
+		&spec.ID, &spec.OwnerID, &spec.Name, &spec.BaseImage, &spec.PythonPackages, &spec.AptPackages,
+		&spec.PythonVersion, &spec.CreatedAt, &spec.UpdatedAt,
+	)
+	if err == sql.ErrNoRows {
+		return nil, fmt.Errorf("environment spec %q not found", id)
+	}
+	return spec, err
+}
+
+func (s *SQLiteStore) ListEnvironmentSpecs(ctx context.Context, ownerID string) ([]*EnvironmentSpecRecord, error) {
+	rows, err := s.db.QueryContext(ctx, `
+		SELECT id, owner_id, name, base_image, python_packages, apt_packages, python_version, created_at, updated_at
+		FROM environment_specs
+		WHERE owner_id = ?
+		ORDER BY created_at DESC`, ownerID)
+	if err != nil {
+		return nil, err
+	}
+	defer rows.Close()
+
+	var specs []*EnvironmentSpecRecord
+	for rows.Next() {
+		spec := &EnvironmentSpecRecord{}
+		if err := rows.Scan(
+			&spec.ID, &spec.OwnerID, &spec.Name, &spec.BaseImage, &spec.PythonPackages, &spec.AptPackages,
+			&spec.PythonVersion, &spec.CreatedAt, &spec.UpdatedAt,
+		); err != nil {
+			return nil, err
+		}
+		specs = append(specs, spec)
+	}
+	return specs, rows.Err()
+}
+
+func (s *SQLiteStore) UpdateEnvironmentSpec(ctx context.Context, spec *EnvironmentSpecRecord) error {
+	res, err := s.db.ExecContext(ctx, `
+		UPDATE environment_specs
+		SET name = ?, base_image = ?, python_packages = ?, apt_packages = ?, python_version = ?, updated_at = ?
+		WHERE id = ?`,
+		spec.Name, spec.BaseImage, spec.PythonPackages, spec.AptPackages, spec.PythonVersion,
+		time.Now().UTC(), spec.ID,
+	)
+	if err != nil {
+		return err
+	}
+	n, _ := res.RowsAffected()
+	if n == 0 {
+		return fmt.Errorf("environment spec %q not found", spec.ID)
+	}
+	return nil
+}
+
+func (s *SQLiteStore) DeleteEnvironmentSpec(ctx context.Context, id string) error {
+	res, err := s.db.ExecContext(ctx, `DELETE FROM environment_specs WHERE id = ?`, id)
+	if err != nil {
+		return err
+	}
+	n, _ := res.RowsAffected()
+	if n == 0 {
+		return fmt.Errorf("environment spec %q not found", id)
+	}
+	return nil
+}
+
+// --- Environment Builds ---
+
+func (s *SQLiteStore) CreateEnvironmentBuild(ctx context.Context, build *EnvironmentBuildRecord) error {
+	_, err := s.db.ExecContext(ctx, `
+		INSERT INTO environment_builds (
+			id, spec_id, status, current_step, log_blob, image_size_bytes, digest_local, error, created_at, finished_at, updated_at
+		) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
+		build.ID, build.SpecID, build.Status, build.CurrentStep, build.LogBlob, build.ImageSizeBytes,
+		build.DigestLocal, build.Error, build.CreatedAt.UTC(), nullableTime(build.FinishedAt), build.UpdatedAt.UTC(),
+	)
+	return err
+}
+
+func (s *SQLiteStore) GetEnvironmentBuild(ctx context.Context, id string) (*EnvironmentBuildRecord, error) {
+	build := &EnvironmentBuildRecord{}
+	var finishedAt sql.NullTime
+
+	err := s.db.QueryRowContext(ctx, `
+		SELECT id, spec_id, status, current_step, log_blob, image_size_bytes, digest_local, error, created_at, finished_at, updated_at
+		FROM environment_builds WHERE id = ?`, id,
+	).Scan(
+		&build.ID, &build.SpecID, &build.Status, &build.CurrentStep, &build.LogBlob, &build.ImageSizeBytes,
+		&build.DigestLocal, &build.Error, &build.CreatedAt, &finishedAt, &build.UpdatedAt,
+	)
+	if err == sql.ErrNoRows {
+		return nil, fmt.Errorf("environment build %q not found", id)
+	}
+	if err != nil {
+		return nil, err
+	}
+	if finishedAt.Valid {
+		t := finishedAt.Time
+		build.FinishedAt = &t
+	}
+	return build, nil
+}
+
+func (s *SQLiteStore) ListEnvironmentBuilds(ctx context.Context, specID string) ([]*EnvironmentBuildRecord, error) {
+	rows, err := s.db.QueryContext(ctx, `
+		SELECT id, spec_id, status, current_step, log_blob, image_size_bytes, digest_local, error, created_at, finished_at, updated_at
+		FROM environment_builds
+		WHERE spec_id = ?
+		ORDER BY created_at DESC`, specID)
+	if err != nil {
+		return nil, err
+	}
+	defer rows.Close()
+
+	var builds []*EnvironmentBuildRecord
+	for rows.Next() {
+		build := &EnvironmentBuildRecord{}
+		var finishedAt sql.NullTime
+		if err := rows.Scan(
+			&build.ID, &build.SpecID, &build.Status, &build.CurrentStep, &build.LogBlob, &build.ImageSizeBytes,
+			&build.DigestLocal, &build.Error, &build.CreatedAt, &finishedAt, &build.UpdatedAt,
+		); err != nil {
+			return nil, err
+		}
+		if finishedAt.Valid {
+			t := finishedAt.Time
+			build.FinishedAt = &t
+		}
+		builds = append(builds, build)
+	}
+	return builds, rows.Err()
+}
+
+func (s *SQLiteStore) UpdateEnvironmentBuild(ctx context.Context, build *EnvironmentBuildRecord) error {
+	res, err := s.db.ExecContext(ctx, `
+		UPDATE environment_builds
+		SET status = ?, current_step = ?, log_blob = ?, image_size_bytes = ?, digest_local = ?, error = ?, finished_at = ?, updated_at = ?
+		WHERE id = ?`,
+		build.Status, build.CurrentStep, build.LogBlob, build.ImageSizeBytes, build.DigestLocal, build.Error,
+		nullableTime(build.FinishedAt), time.Now().UTC(), build.ID,
+	)
+	if err != nil {
+		return err
+	}
+	n, _ := res.RowsAffected()
+	if n == 0 {
+		return fmt.Errorf("environment build %q not found", build.ID)
+	}
+	return nil
+}
+
+// --- Environment Artifacts ---
+
+func (s *SQLiteStore) SaveEnvironmentArtifact(ctx context.Context, artifact *EnvironmentArtifactRecord) error {
+	_, err := s.db.ExecContext(ctx, `
+		INSERT INTO environment_artifacts (build_id, target, image_ref, digest, status, error, created_at, updated_at)
+		VALUES (?, ?, ?, ?, ?, ?, ?, ?)
+		ON CONFLICT(build_id, target) DO UPDATE SET
+			image_ref = excluded.image_ref,
+			digest = excluded.digest,
+			status = excluded.status,
+			error = excluded.error,
+			updated_at = excluded.updated_at`,
+		artifact.BuildID, artifact.Target, artifact.ImageRef, artifact.Digest, artifact.Status, artifact.Error,
+		time.Now().UTC(), time.Now().UTC(),
+	)
+	return err
+}
+
+func (s *SQLiteStore) ListEnvironmentArtifacts(ctx context.Context, buildID string) ([]*EnvironmentArtifactRecord, error) {
+	rows, err := s.db.QueryContext(ctx, `
+		SELECT id, build_id, target, image_ref, digest, status, error, created_at, updated_at
+		FROM environment_artifacts
+		WHERE build_id = ?
+		ORDER BY id ASC`, buildID)
+	if err != nil {
+		return nil, err
+	}
+	defer rows.Close()
+
+	var artifacts []*EnvironmentArtifactRecord
+	for rows.Next() {
+		artifact := &EnvironmentArtifactRecord{}
+		if err := rows.Scan(
+			&artifact.ID, &artifact.BuildID, &artifact.Target, &artifact.ImageRef, &artifact.Digest,
+			&artifact.Status, &artifact.Error, &artifact.CreatedAt, &artifact.UpdatedAt,
+		); err != nil {
+			return nil, err
+		}
+		artifacts = append(artifacts, artifact)
+	}
+	return artifacts, rows.Err()
+}
+
+// --- Registry Connections ---
+
+func (s *SQLiteStore) SaveRegistryConnection(ctx context.Context, conn *RegistryConnectionRecord) error {
+	_, err := s.db.ExecContext(ctx, `
+		INSERT INTO registry_connections (id, owner_id, provider, username, secret_ref, is_default, created_at, updated_at)
+		VALUES (?, ?, ?, ?, ?, ?, ?, ?)
+		ON CONFLICT(id) DO UPDATE SET
+			owner_id = excluded.owner_id,
+			provider = excluded.provider,
+			username = excluded.username,
+			secret_ref = excluded.secret_ref,
+			is_default = excluded.is_default,
+			updated_at = excluded.updated_at`,
+		conn.ID, conn.OwnerID, conn.Provider, conn.Username, conn.SecretRef, conn.IsDefault,
+		time.Now().UTC(), time.Now().UTC(),
+	)
+	return err
+}
+
+func (s *SQLiteStore) GetRegistryConnection(ctx context.Context, id string) (*RegistryConnectionRecord, error) {
+	conn := &RegistryConnectionRecord{}
+	err := s.db.QueryRowContext(ctx, `
+		SELECT id, owner_id, provider, username, secret_ref, is_default, created_at, updated_at
+		FROM registry_connections
+		WHERE id = ?`, id,
+	).Scan(&conn.ID, &conn.OwnerID, &conn.Provider, &conn.Username, &conn.SecretRef, &conn.IsDefault, &conn.CreatedAt, &conn.UpdatedAt)
+	if err == sql.ErrNoRows {
+		return nil, fmt.Errorf("registry connection %q not found", id)
+	}
+	return conn, err
+}
+
+func (s *SQLiteStore) ListRegistryConnections(ctx context.Context, ownerID string) ([]*RegistryConnectionRecord, error) {
+	rows, err := s.db.QueryContext(ctx, `
+		SELECT id, owner_id, provider, username, secret_ref, is_default, created_at, updated_at
+		FROM registry_connections
+		WHERE owner_id = ?
+		ORDER BY created_at DESC`, ownerID)
+	if err != nil {
+		return nil, err
+	}
+	defer rows.Close()
+
+	var conns []*RegistryConnectionRecord
+	for rows.Next() {
+		conn := &RegistryConnectionRecord{}
+		if err := rows.Scan(
+			&conn.ID, &conn.OwnerID, &conn.Provider, &conn.Username, &conn.SecretRef, &conn.IsDefault, &conn.CreatedAt, &conn.UpdatedAt,
+		); err != nil {
+			return nil, err
+		}
+		conns = append(conns, conn)
+	}
+	return conns, rows.Err()
+}
+
+func (s *SQLiteStore) DeleteRegistryConnection(ctx context.Context, id string) error {
+	res, err := s.db.ExecContext(ctx, `DELETE FROM registry_connections WHERE id = ?`, id)
+	if err != nil {
+		return err
+	}
+	n, _ := res.RowsAffected()
+	if n == 0 {
+		return fmt.Errorf("registry connection %q not found", id)
+	}
+	return nil
+}
+
+func nullableTime(t *time.Time) any {
+	if t == nil {
+		return nil
+	}
+	return t.UTC()
+}
+
 func (s *SQLiteStore) Close() error {
 	return s.db.Close()
 }

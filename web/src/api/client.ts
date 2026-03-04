@@ -96,6 +96,98 @@ export interface SSEEvent {
   id?: string;
 }
 
+export interface EnvironmentSpec {
+  id: string;
+  owner_id: string;
+  name: string;
+  base_image: string;
+  python_packages: string[];
+  apt_packages: string[];
+  python_version?: string;
+  created_at: string;
+  updated_at: string;
+}
+
+export interface CreateEnvironmentSpecRequest {
+  owner_id: string;
+  name: string;
+  base_image: string;
+  python_packages: string[];
+  apt_packages?: string[];
+  python_version?: string;
+}
+
+export interface EnvironmentArtifact {
+  target: 'local' | 'ghcr' | 'dockerhub' | string;
+  image_ref: string;
+  digest?: string;
+  status: string;
+  error?: string;
+  created_at: string;
+  updated_at: string;
+}
+
+export interface EnvironmentBuild {
+  id: string;
+  spec_id: string;
+  status: 'queued' | 'building' | 'ready' | 'failed' | 'canceled' | string;
+  current_step: string;
+  log: string;
+  image_size_bytes: number;
+  digest_local?: string;
+  error?: string;
+  created_at: string;
+  finished_at?: string;
+  updated_at: string;
+  artifacts: EnvironmentArtifact[];
+}
+
+export interface StartEnvironmentBuildRequest {
+  spec_id: string;
+  targets: Array<'local' | 'ghcr' | 'dockerhub'>;
+  visibility?: string;
+}
+
+export interface EnvironmentSpawnConfig {
+  build_id: string;
+  build_status: string;
+  ready: boolean;
+  provider: string;
+  image: string;
+  target: string;
+  digest?: string;
+  note: string;
+}
+
+export interface EnvironmentBuildListItem {
+  build: EnvironmentBuild;
+  spec: EnvironmentSpec;
+}
+
+export interface RegistryConnection {
+  id: string;
+  owner_id: string;
+  provider: 'ghcr' | 'dockerhub' | string;
+  username: string;
+  is_default: boolean;
+  created_at: string;
+  updated_at: string;
+}
+
+export interface SaveRegistryConnectionRequest {
+  id?: string;
+  owner_id: string;
+  provider: 'ghcr' | 'dockerhub';
+  username: string;
+  secret_ref: string;
+  is_default: boolean;
+}
+
+export interface EnvironmentSuggestionsResponse {
+  spec_id: string;
+  suggestions: string[];
+}
+
 // ---------------------------------------------------------------------------
 // API Error
 // ---------------------------------------------------------------------------
@@ -411,6 +503,89 @@ export interface SnapshotSummary {
 export async function listSnapshots(): Promise<SnapshotSummary[]> {
   const result = await request<SnapshotSummary[] | null>('/snapshots');
   return result ?? [];
+}
+
+// ---------------------------------------------------------------------------
+// Environments
+// ---------------------------------------------------------------------------
+
+export async function createEnvironmentSpec(
+  req: CreateEnvironmentSpecRequest,
+): Promise<EnvironmentSpec> {
+  return request<EnvironmentSpec>('/environments/specs', {
+    method: 'POST',
+    body: JSON.stringify(req),
+  });
+}
+
+export async function listEnvironmentSpecs(ownerId: string): Promise<EnvironmentSpec[]> {
+  const result = await request<EnvironmentSpec[] | null>(
+    `/environments/specs?owner_id=${encodeURIComponent(ownerId)}`,
+  );
+  return result ?? [];
+}
+
+export async function getEnvironmentSuggestions(specId: string): Promise<EnvironmentSuggestionsResponse> {
+  return request<EnvironmentSuggestionsResponse>(
+    `/environments/specs/${encodeURIComponent(specId)}/suggestions`,
+  );
+}
+
+export async function startEnvironmentBuild(
+  req: StartEnvironmentBuildRequest,
+): Promise<EnvironmentBuild> {
+  return request<EnvironmentBuild>('/environments/builds', {
+    method: 'POST',
+    body: JSON.stringify(req),
+  });
+}
+
+export async function getEnvironmentBuild(buildId: string): Promise<EnvironmentBuild> {
+  return request<EnvironmentBuild>(`/environments/builds/${encodeURIComponent(buildId)}`);
+}
+
+export async function listEnvironmentBuilds(
+  ownerId: string,
+  limit = 30,
+): Promise<EnvironmentBuildListItem[]> {
+  const result = await request<EnvironmentBuildListItem[] | null>(
+    `/environments/builds?owner_id=${encodeURIComponent(ownerId)}&limit=${limit}`,
+  );
+  return result ?? [];
+}
+
+export async function cancelEnvironmentBuild(buildId: string): Promise<EnvironmentBuild> {
+  return request<EnvironmentBuild>(`/environments/builds/${encodeURIComponent(buildId)}/cancel`, {
+    method: 'POST',
+  });
+}
+
+export async function getEnvironmentSpawnConfig(buildId: string): Promise<EnvironmentSpawnConfig> {
+  return request<EnvironmentSpawnConfig>(
+    `/environments/builds/${encodeURIComponent(buildId)}/spawn-config`,
+  );
+}
+
+export async function saveRegistryConnection(
+  req: SaveRegistryConnectionRequest,
+): Promise<RegistryConnection> {
+  return request<RegistryConnection>('/environments/registry-connections', {
+    method: 'POST',
+    body: JSON.stringify(req),
+  });
+}
+
+export async function listRegistryConnections(ownerId: string): Promise<RegistryConnection[]> {
+  const result = await request<RegistryConnection[] | null>(
+    `/environments/registry-connections?owner_id=${encodeURIComponent(ownerId)}`,
+  );
+  return result ?? [];
+}
+
+export async function deleteRegistryConnection(connectionId: string): Promise<void> {
+  await request<void>(`/environments/registry-connections/${encodeURIComponent(connectionId)}`, {
+    method: 'DELETE',
+  });
 }
 
 // ---------------------------------------------------------------------------
