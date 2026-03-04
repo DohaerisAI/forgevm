@@ -264,3 +264,152 @@ func TestGetSandboxNotFound(t *testing.T) {
 		t.Fatal("expected error for nonexistent sandbox")
 	}
 }
+
+func TestEnvironmentSpecCRUD(t *testing.T) {
+	s := testStore(t)
+	ctx := context.Background()
+	now := time.Now().UTC()
+
+	spec := &EnvironmentSpecRecord{
+		ID:             "envspec-1",
+		OwnerID:        "user-1",
+		Name:           "py-ds",
+		BaseImage:      "python:3.12-slim",
+		PythonPackages: `["pandas","numpy"]`,
+		AptPackages:    `["curl"]`,
+		PythonVersion:  "3.12",
+		CreatedAt:      now,
+		UpdatedAt:      now,
+	}
+
+	if err := s.CreateEnvironmentSpec(ctx, spec); err != nil {
+		t.Fatalf("create spec: %v", err)
+	}
+
+	got, err := s.GetEnvironmentSpec(ctx, spec.ID)
+	if err != nil {
+		t.Fatalf("get spec: %v", err)
+	}
+	if got.BaseImage != "python:3.12-slim" {
+		t.Fatalf("base image mismatch: %s", got.BaseImage)
+	}
+
+	spec.Name = "py-ds-v2"
+	spec.PythonPackages = `["pandas","numpy","matplotlib"]`
+	if err := s.UpdateEnvironmentSpec(ctx, spec); err != nil {
+		t.Fatalf("update spec: %v", err)
+	}
+
+	list, err := s.ListEnvironmentSpecs(ctx, "user-1")
+	if err != nil {
+		t.Fatalf("list specs: %v", err)
+	}
+	if len(list) != 1 {
+		t.Fatalf("expected 1 spec, got %d", len(list))
+	}
+
+	if err := s.DeleteEnvironmentSpec(ctx, spec.ID); err != nil {
+		t.Fatalf("delete spec: %v", err)
+	}
+	if _, err := s.GetEnvironmentSpec(ctx, spec.ID); err == nil {
+		t.Fatal("expected get to fail after delete")
+	}
+}
+
+func TestEnvironmentBuildArtifactAndRegistryCRUD(t *testing.T) {
+	s := testStore(t)
+	ctx := context.Background()
+	now := time.Now().UTC()
+
+	spec := &EnvironmentSpecRecord{
+		ID:             "envspec-2",
+		OwnerID:        "user-2",
+		Name:           "py-tools",
+		BaseImage:      "python:3.12-slim",
+		PythonPackages: `[]`,
+		AptPackages:    `[]`,
+		PythonVersion:  "3.12",
+		CreatedAt:      now,
+		UpdatedAt:      now,
+	}
+	if err := s.CreateEnvironmentSpec(ctx, spec); err != nil {
+		t.Fatalf("create spec: %v", err)
+	}
+
+	build := &EnvironmentBuildRecord{
+		ID:             "envbuild-1",
+		SpecID:         spec.ID,
+		Status:         "queued",
+		CurrentStep:    "validate_spec",
+		LogBlob:        "",
+		ImageSizeBytes: 0,
+		DigestLocal:    "",
+		Error:          "",
+		CreatedAt:      now,
+		UpdatedAt:      now,
+	}
+	if err := s.CreateEnvironmentBuild(ctx, build); err != nil {
+		t.Fatalf("create build: %v", err)
+	}
+
+	build.Status = "ready"
+	build.CurrentStep = "finalize"
+	finished := time.Now().UTC()
+	build.FinishedAt = &finished
+	build.DigestLocal = "sha256:abc123"
+	if err := s.UpdateEnvironmentBuild(ctx, build); err != nil {
+		t.Fatalf("update build: %v", err)
+	}
+
+	gb, err := s.GetEnvironmentBuild(ctx, build.ID)
+	if err != nil {
+		t.Fatalf("get build: %v", err)
+	}
+	if gb.Status != "ready" {
+		t.Fatalf("expected ready build status, got %s", gb.Status)
+	}
+
+	artifact := &EnvironmentArtifactRecord{
+		BuildID:  build.ID,
+		Target:   "local",
+		ImageRef: "local/env:1",
+		Digest:   "sha256:def456",
+		Status:   "ready",
+		Error:    "",
+	}
+	if err := s.SaveEnvironmentArtifact(ctx, artifact); err != nil {
+		t.Fatalf("save artifact: %v", err)
+	}
+
+	artifacts, err := s.ListEnvironmentArtifacts(ctx, build.ID)
+	if err != nil {
+		t.Fatalf("list artifacts: %v", err)
+	}
+	if len(artifacts) != 1 {
+		t.Fatalf("expected 1 artifact, got %d", len(artifacts))
+	}
+
+	conn := &RegistryConnectionRecord{
+		ID:        "reg-1",
+		OwnerID:   "user-2",
+		Provider:  "ghcr",
+		Username:  "octocat",
+		SecretRef: "secret://ghcr/user-2/default",
+		IsDefault: true,
+	}
+	if err := s.SaveRegistryConnection(ctx, conn); err != nil {
+		t.Fatalf("save registry connection: %v", err)
+	}
+
+	conns, err := s.ListRegistryConnections(ctx, "user-2")
+	if err != nil {
+		t.Fatalf("list registry connections: %v", err)
+	}
+	if len(conns) != 1 {
+		t.Fatalf("expected 1 registry connection, got %d", len(conns))
+	}
+
+	if err := s.DeleteRegistryConnection(ctx, conn.ID); err != nil {
+		t.Fatalf("delete registry connection: %v", err)
+	}
+}
