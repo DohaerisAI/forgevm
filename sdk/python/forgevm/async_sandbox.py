@@ -151,7 +151,7 @@ class AsyncSandbox:
         return resp.json()
 
     async def extend_ttl(self, ttl: str = "30m") -> None:
-        """Extend this sandbox's TTL by the given duration."""
+        """Extend this sandbox's TTL. New expiry is calculated from now, not from the current expiry."""
         resp = await self._http.post(f"/api/v1/sandboxes/{self.id}/extend", json={"ttl": ttl})
         handle_response(resp)
         await self.refresh()
