@@ -741,7 +741,7 @@ func (m *Manager) ExtendTTL(ctx context.Context, id string, extra time.Duration)
 		return nil, err
 	}
 
-	newExpiresAt := sb.ExpiresAt.Add(extra)
+	newExpiresAt := time.Now().Add(extra)
 	if err := m.store.UpdateSandboxExpiresAt(ctx, id, newExpiresAt); err != nil {
 		return nil, fmt.Errorf("extending TTL: %w", err)
 	}
