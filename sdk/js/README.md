@@ -26,6 +26,13 @@ console.log(result.stdout); // "hello\n"
 await sandbox.writeFile("/tmp/hello.txt", "Hello, world!");
 const content = await sandbox.readFile("/tmp/hello.txt");
 
+// Extended file operations
+await sandbox.moveFile("/tmp/hello.txt", "/tmp/greeting.txt");
+await sandbox.chmodFile("/tmp/greeting.txt", "755");
+const info = await sandbox.statFile("/tmp/greeting.txt");
+const matches = await sandbox.globFiles("/tmp/*.txt");
+await sandbox.deleteFile("/tmp/greeting.txt");
+
 // Extend TTL
 await sandbox.extendTtl("30m");
 

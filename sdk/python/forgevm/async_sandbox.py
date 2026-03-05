@@ -37,6 +37,7 @@ class AsyncSandbox:
         args: list[str] | None = None,
         env: dict[str, str] | None = None,
         workdir: str | None = None,
+        timeout: str | None = None,
     ) -> ExecResult:
         """Execute a command in the sandbox."""
         body: dict = {"command": command}
@@ -46,6 +47,8 @@ class AsyncSandbox:
             body["env"] = env
         if workdir:
             body["workdir"] = workdir
+        if timeout:
+            body["timeout"] = timeout
 
         resp = await self._http.post(f"/api/v1/sandboxes/{self.id}/exec", json=body)
         handle_response(resp)
@@ -146,6 +149,12 @@ class AsyncSandbox:
         )
         handle_response(resp)
         return resp.json()
+
+    async def extend_ttl(self, ttl: str = "30m") -> None:
+        """Extend this sandbox's TTL. New expiry is calculated from now, not from the current expiry."""
+        resp = await self._http.post(f"/api/v1/sandboxes/{self.id}/extend", json={"ttl": ttl})
+        handle_response(resp)
+        await self.refresh()
 
     async def destroy(self) -> None:
         """Destroy this sandbox."""

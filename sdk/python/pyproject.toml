@@ -4,14 +4,37 @@ build-backend = "setuptools.build_meta"
 
 [project]
 name = "forgevm"
-version = "0.1.0"
-description = "Python SDK for the ForgeVM sandbox orchestrator"
+version = "0.1.2"
+description = "Python SDK for ForgeVM — self-hosted microVM sandboxes for LLMs"
 readme = "README.md"
 requires-python = ">=3.9"
 license = {text = "MIT"}
+authors = [
+    {name = "DohaerisAI"},
+]
+keywords = ["forgevm", "sandbox", "microvm", "llm", "code-execution", "firecracker", "ai-agent"]
+classifiers = [
+    "Development Status :: 4 - Beta",
+    "Intended Audience :: Developers",
+    "License :: OSI Approved :: MIT License",
+    "Programming Language :: Python :: 3",
+    "Programming Language :: Python :: 3.9",
+    "Programming Language :: Python :: 3.10",
+    "Programming Language :: Python :: 3.11",
+    "Programming Language :: Python :: 3.12",
+    "Programming Language :: Python :: 3.13",
+    "Topic :: Software Development :: Libraries",
+    "Topic :: System :: Emulators",
+]
 dependencies = [
     "httpx>=0.27.0",
 ]
+
+[project.urls]
+Homepage = "https://github.com/DohaerisAI/forgevm"
+Repository = "https://github.com/DohaerisAI/forgevm"
+Documentation = "https://github.com/DohaerisAI/forgevm#use-with-python"
+Issues = "https://github.com/DohaerisAI/forgevm/issues"
 
 [project.optional-dependencies]
 dev = [

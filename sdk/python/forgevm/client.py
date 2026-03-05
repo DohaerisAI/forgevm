@@ -46,6 +46,7 @@ class Client:
         memory_mb: int | None = None,
         vcpus: int | None = None,
         ttl: str | None = None,
+        template: str | None = None,
         metadata: dict[str, str] | None = None,
     ) -> Sandbox:
         """Spawn a new sandbox."""
@@ -58,6 +59,8 @@ class Client:
             body["vcpus"] = vcpus
         if ttl:
             body["ttl"] = ttl
+        if template:
+            body["template"] = template
         if metadata:
             body["metadata"] = metadata
 
@@ -95,6 +98,17 @@ class Client:
             )
             for s in resp.json()
         ]
+
+    def spawn_template(self, template_name: str) -> Sandbox:
+        """Spawn a sandbox from a saved template."""
+        try:
+            resp = self._http.post(f"/api/v1/templates/{template_name}/spawn")
+        except httpx.ConnectError as e:
+            raise ConnectionError(f"Cannot connect to ForgeVM server: {e}")
+
+        handle_response(resp)
+        data = resp.json()
+        return Sandbox(self._http, data["id"], info=data)
 
     def prune(self) -> int:
         """Prune expired sandboxes. Returns count pruned."""
