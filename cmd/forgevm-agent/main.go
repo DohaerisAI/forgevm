@@ -15,6 +15,7 @@ import (
 	"os/exec"
 	"path/filepath"
 	"strconv"
+	"strings"
 	"syscall"
 	"time"
 	"unsafe"
@@ -167,6 +168,11 @@ func handlePing(w io.Writer, req *agentproto.Request) {
 	})
 }
 
+// shellQuote wraps a string in single quotes for safe shell interpolation.
+func shellQuote(s string) string {
+	return "'" + strings.ReplaceAll(s, "'", "'\"'\"'") + "'"
+}
+
 func handleExec(w io.Writer, req *agentproto.Request) {
 	var params agentproto.ExecParams
 	if err := agentproto.UnmarshalParams(req.Params, &params); err != nil {
@@ -177,7 +183,15 @@ func handleExec(w io.Writer, req *agentproto.Request) {
 	ctx, cancel := context.WithTimeout(context.Background(), 5*time.Minute)
 	defer cancel()
 
-	cmd := exec.CommandContext(ctx, "/bin/sh", "-c", params.Command)
+	// Build full shell command: if args provided, shell-quote and append them
+	shellCmd := params.Command
+	if len(params.Args) > 0 {
+		for _, a := range params.Args {
+			shellCmd += " " + shellQuote(a)
+		}
+	}
+
+	cmd := exec.CommandContext(ctx, "/bin/sh", "-c", shellCmd)
 	if params.WorkDir != "" {
 		cmd.Dir = params.WorkDir
 	}
@@ -224,7 +238,15 @@ func handleExecStream(w io.Writer, req *agentproto.Request) {
 	ctx, cancel := context.WithTimeout(context.Background(), 5*time.Minute)
 	defer cancel()
 
-	cmd := exec.CommandContext(ctx, "/bin/sh", "-c", params.Command)
+	// Build full shell command: if args provided, shell-quote and append them
+	shellCmd := params.Command
+	if len(params.Args) > 0 {
+		for _, a := range params.Args {
+			shellCmd += " " + shellQuote(a)
+		}
+	}
+
+	cmd := exec.CommandContext(ctx, "/bin/sh", "-c", shellCmd)
 	if params.WorkDir != "" {
 		cmd.Dir = params.WorkDir
 	}

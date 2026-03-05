@@ -1,24 +1,28 @@
-FROM python:3.12-slim
+FROM ubuntu:24.04
 
-# System tools
-RUN apt-get update && apt-get install -y --no-install-recommends \
-    bc gawk sed grep curl && \
-    rm -rf /var/lib/apt/lists/*
+RUN apt-get update && apt-get install -y \
+    python3 \
+    python3-pip \
+    python3-venv \
+    curl \
+    wget \
+    git \
+    zip \
+    unzip \
+    jq \
+    vim \
+    nano \
+    htop \
+    net-tools \
+    iputils-ping \
+    build-essential \
+    && rm -rf /var/lib/apt/lists/*
 
-# Python packages for data/file generation
-RUN pip install --no-cache-dir \
-    pandas \
-    numpy \
-    matplotlib \
-    openpyxl \
-    reportlab \
+RUN pip3 install --no-cache-dir --break-system-packages \
     python-docx \
-    pillow
-
-# Pre-import to warm up .pyc caches
-RUN python3 -c "import pandas, numpy, matplotlib, openpyxl, reportlab, docx, PIL; print('all imports ok')"
-
-# Default working dirs
-RUN mkdir -p /workspace /output /data
+    python-pptx \
+    reportlab \
+    pandas \
+    numpy
 
 WORKDIR /workspace
