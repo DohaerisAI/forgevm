@@ -363,7 +363,7 @@ export class Sandbox {
    * Extend this sandbox's TTL by the given duration.
    *
    * @param ttl - A Go-style duration string (e.g. `"30m"`, `"1h"`).
-   *   The duration is added to the current expiry time, not to `now`.
+   *   The new expiry is calculated from now, not from the current expiry.
    *
    * @example
    * ```ts
