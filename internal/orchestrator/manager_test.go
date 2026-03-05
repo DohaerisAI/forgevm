@@ -176,21 +176,26 @@ func TestManager_ExtendTTL(t *testing.T) {
 	}
 	originalExpiry := sb.ExpiresAt
 
-	// Extend by 30 minutes
+	// Extend by 30 minutes (extends from now, not from original expiry)
+	beforeExtend := time.Now()
 	updated, err := m.ExtendTTL(ctx, sb.ID, 30*time.Minute)
 	if err != nil {
 		t.Fatalf("extend: %v", err)
 	}
 
-	expectedExpiry := originalExpiry.Add(30 * time.Minute)
-	if !updated.ExpiresAt.Equal(expectedExpiry) {
-		t.Fatalf("expected expires_at %v, got %v", expectedExpiry, updated.ExpiresAt)
+	// New expiry should be ~30m from now, which is later than the original 5m expiry
+	if !updated.ExpiresAt.After(originalExpiry) {
+		t.Fatalf("expected new expiry after original, got %v <= %v", updated.ExpiresAt, originalExpiry)
+	}
+	expectedMin := beforeExtend.Add(30 * time.Minute)
+	if updated.ExpiresAt.Before(expectedMin.Add(-time.Second)) {
+		t.Fatalf("expected expires_at >= ~%v, got %v", expectedMin, updated.ExpiresAt)
 	}
 
 	// Verify via Get
 	got, _ := m.Get(ctx, sb.ID)
-	if !got.ExpiresAt.Equal(expectedExpiry) {
-		t.Fatalf("Get: expected expires_at %v, got %v", expectedExpiry, got.ExpiresAt)
+	if !got.ExpiresAt.Equal(updated.ExpiresAt) {
+		t.Fatalf("Get: expected expires_at %v, got %v", updated.ExpiresAt, got.ExpiresAt)
 	}
 }
 
