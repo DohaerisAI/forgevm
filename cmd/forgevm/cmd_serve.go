@@ -92,6 +92,38 @@ func runServe() error {
 		registry.Register(custom)
 		logger.Info().Str("name", cfg.Providers.Custom.Name).Str("url", cfg.Providers.Custom.BaseURL).Msg("custom provider registered")
 	}
+	if cfg.Providers.Docker.Enabled {
+		docker, err := providers.NewDockerProvider(providers.DockerProviderConfig{
+			Socket:         cfg.Providers.Docker.Socket,
+			Runtime:        cfg.Providers.Docker.Runtime,
+			DefaultImage:   cfg.Providers.Docker.DefaultImage,
+			NetworkMode:    cfg.Providers.Docker.NetworkMode,
+			SeccompProfile: cfg.Providers.Docker.SeccompProfile,
+			ReadOnlyRootfs: cfg.Providers.Docker.ReadOnlyRootfs,
+			Memory:         cfg.Providers.Docker.Memory,
+			CPUs:           cfg.Providers.Docker.CPUs,
+			PidsLimit:      cfg.Providers.Docker.PidsLimit,
+			User:           cfg.Providers.Docker.User,
+			DroppedCaps:    cfg.Providers.Docker.DroppedCaps,
+			AddedCaps:      cfg.Providers.Docker.AddedCaps,
+			Tmpfs:          cfg.Providers.Docker.Tmpfs,
+			PoolSecurity: providers.PoolSecurityProviderConfig{
+				PerUserUID:           cfg.Providers.Docker.PoolSecurity.PerUserUID,
+				PIDNamespace:         cfg.Providers.Docker.PoolSecurity.PIDNamespace,
+				WorkspacePermissions: cfg.Providers.Docker.PoolSecurity.WorkspacePermissions,
+				HidePID:              cfg.Providers.Docker.PoolSecurity.HidePID,
+			},
+		}, logger)
+		if err != nil {
+			logger.Error().Err(err).Msg("failed to create docker provider")
+		} else {
+			registry.Register(docker)
+			logger.Info().
+				Str("runtime", cfg.Providers.Docker.Runtime).
+				Str("network", cfg.Providers.Docker.NetworkMode).
+				Msg("docker provider registered")
+		}
+	}
 	if err := registry.SetDefault(cfg.Providers.Default); err != nil {
 		logger.Warn().Err(err).Msg("setting default provider")
 	}
