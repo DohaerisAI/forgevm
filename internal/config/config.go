@@ -43,8 +43,34 @@ type ProvidersConfig struct {
 	Default     string            `mapstructure:"default"`
 	Mock        MockConfig        `mapstructure:"mock"`
 	Firecracker FirecrackerConfig `mapstructure:"firecracker"`
+	Docker      DockerConfig      `mapstructure:"docker"`
 	E2B         E2BConfig         `mapstructure:"e2b"`
 	Custom      CustomConfig      `mapstructure:"custom"`
+}
+
+type DockerConfig struct {
+	Enabled        bool              `mapstructure:"enabled"`
+	Socket         string            `mapstructure:"socket"`
+	Runtime        string            `mapstructure:"runtime"`
+	DefaultImage   string            `mapstructure:"default_image"`
+	NetworkMode    string            `mapstructure:"network_mode"`
+	SeccompProfile string            `mapstructure:"seccomp_profile"`
+	ReadOnlyRootfs bool              `mapstructure:"read_only_rootfs"`
+	Memory         string            `mapstructure:"memory"`
+	CPUs           string            `mapstructure:"cpus"`
+	PidsLimit      int64             `mapstructure:"pids_limit"`
+	User           string            `mapstructure:"user"`
+	DroppedCaps    []string          `mapstructure:"dropped_caps"`
+	AddedCaps      []string          `mapstructure:"added_caps"`
+	Tmpfs          map[string]string `mapstructure:"tmpfs"`
+	PoolSecurity   PoolSecurityConfig `mapstructure:"pool_security"`
+}
+
+type PoolSecurityConfig struct {
+	PerUserUID           bool `mapstructure:"per_user_uid"`
+	PIDNamespace         bool `mapstructure:"pid_namespace"`
+	WorkspacePermissions bool `mapstructure:"workspace_permissions"`
+	HidePID              bool `mapstructure:"hidepid"`
 }
 
 type E2BConfig struct {
@@ -118,6 +144,24 @@ func setDefaults(v *viper.Viper) {
 	v.SetDefault("providers.custom.base_url", "")
 	v.SetDefault("providers.custom.api_key", "")
 	v.SetDefault("providers.custom.timeout", "60s")
+
+	v.SetDefault("providers.docker.enabled", false)
+	v.SetDefault("providers.docker.socket", "unix:///var/run/docker.sock")
+	v.SetDefault("providers.docker.runtime", "runc")
+	v.SetDefault("providers.docker.default_image", "alpine:latest")
+	v.SetDefault("providers.docker.network_mode", "none")
+	v.SetDefault("providers.docker.seccomp_profile", "default")
+	v.SetDefault("providers.docker.read_only_rootfs", true)
+	v.SetDefault("providers.docker.memory", "512m")
+	v.SetDefault("providers.docker.cpus", "1")
+	v.SetDefault("providers.docker.pids_limit", 256)
+	v.SetDefault("providers.docker.user", "")
+	v.SetDefault("providers.docker.dropped_caps", []string{"ALL"})
+	v.SetDefault("providers.docker.added_caps", []string{})
+	v.SetDefault("providers.docker.pool_security.per_user_uid", false)
+	v.SetDefault("providers.docker.pool_security.pid_namespace", false)
+	v.SetDefault("providers.docker.pool_security.workspace_permissions", true)
+	v.SetDefault("providers.docker.pool_security.hidepid", false)
 
 	v.SetDefault("defaults.ttl", "30m")
 	v.SetDefault("defaults.image", "alpine:latest")
