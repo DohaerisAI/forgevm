@@ -1,215 +1,54 @@
 <p align="center">
-  <img src="assets/logo.png" alt="ForgeVM" width="500">
+  <img src="assets/logo.png" alt="ForgeVM" width="200"/>
+</p>
+
+<h3 align="center"><b>Your AI agent just got its own computer.</b></h3>
+
+<p align="center">
+Like E2B but self-hosted. Like Docker but actually isolated. Like Daytona but one binary.
 </p>
 
 <p align="center">
-  <b>E2B charges per second. You run the computer.</b>
+One tool. Every isolation level. Every platform.<br><br>
+On a Mac? Docker provider, no KVM needed.<br>
+On bare metal? Firecracker microVMs in ~28ms.<br>
+On Kubernetes? gVisor or Kata containers.<br>
+Need 100 sandboxes but only have 20 VMs? Pool mode.<br><br>
+Self-hosted. Single binary. Python &amp; TypeScript SDKs. MIT licensed. No cloud required.
 </p>
 
 <p align="center">
-  Self-hosted sandbox orchestration for AI agents. Single binary.<br>
-  Firecracker microVMs (~28ms boot) or Docker containers (no KVM needed). Python + TypeScript SDKs.
+  <a href="https://github.com/DohaerisAI/forgevm/stargazers"><img src="https://img.shields.io/github/stars/DohaerisAI/forgevm?style=flat-square" alt="Stars"/></a>
+  <a href="https://github.com/DohaerisAI/forgevm/network/members"><img src="https://img.shields.io/github/forks/DohaerisAI/forgevm?style=flat-square" alt="Forks"/></a>
+  <a href="https://github.com/DohaerisAI/forgevm/issues"><img src="https://img.shields.io/github/issues/DohaerisAI/forgevm?style=flat-square" alt="Issues"/></a>
+  <img src="https://img.shields.io/badge/go-1.25+-00ADD8?style=flat-square&logo=go&logoColor=white" alt="Go"/>
+  <img src="https://img.shields.io/badge/license-MIT-green?style=flat-square" alt="MIT"/>
+  <img src="https://img.shields.io/badge/platform-linux%20%7C%20mac%20%7C%20windows-blue?style=flat-square" alt="Platform"/>
 </p>
 
 <p align="center">
-  <a href="https://github.com/DohaerisAI/forgevm/releases/latest"><img src="https://img.shields.io/github/v/release/DohaerisAI/forgevm?style=flat-square&label=release" alt="Release"></a>
-  <a href="https://github.com/DohaerisAI/forgevm/stargazers"><img src="https://img.shields.io/github/stars/DohaerisAI/forgevm?style=flat-square" alt="Stars"></a>
-  <a href="https://github.com/DohaerisAI/forgevm/actions/workflows/ci.yml"><img src="https://img.shields.io/github/actions/workflow/status/DohaerisAI/forgevm/ci.yml?style=flat-square&label=CI" alt="CI"></a>
-  <img src="https://img.shields.io/badge/go-1.25+-00ADD8?style=flat-square&logo=go&logoColor=white" alt="Go 1.25+">
-  <img src="https://img.shields.io/badge/license-MIT-green?style=flat-square" alt="MIT License">
+  <a href="#quick-start-30-seconds">Quick Start</a> •
+  <a href="#why-forgevm">Why ForgeVM</a> •
+  <a href="#pick-your-isolation-level">Providers</a> •
+  <a href="#pool-mode">Pool Mode</a> •
+  <a href="docs/">Docs</a>
 </p>
+
+<!-- TODO: Replace with actual demo GIF — record with: vhs demo.tape -->
+<!-- <p align="center"><img src="assets/demo.gif" width="640"/></p> -->
 
 ---
 
-## 30-second demo
+## Quick start (30 seconds)
 
 ```bash
-# Install
-curl -fsSL https://raw.githubusercontent.com/DohaerisAI/forgevm/main/scripts/install.sh | bash
-
-# Start
-forgevm serve
-
-# Spawn → run code → destroy
-SB=$(curl -s -X POST localhost:7423/api/v1/sandboxes \
-  -H 'Content-Type: application/json' \
-  -d '{"image":"python:3.12"}' | jq -r .id)
-
-curl -s -X POST localhost:7423/api/v1/sandboxes/$SB/exec \
-  -d '{"command":"python3 -c \"print(2**32)\"}' | jq .stdout
-# "4294967296\n"
-
-curl -s -X DELETE localhost:7423/api/v1/sandboxes/$SB
+git clone https://github.com/DohaerisAI/forgevm && cd forgevm
+./scripts/setup.sh
+./forgevm serve
+# ForgeVM listening on http://localhost:7423
 ```
-
----
-
-## Why ForgeVM
-
-|  | **ForgeVM (Firecracker)** | **ForgeVM (Docker)** | **E2B** | **Docker alone** |
-|--|:---:|:---:|:---:|:---:|
-| Hosting | Self-hosted | Self-hosted | Cloud only | Self-hosted |
-| KVM required | Yes | **No** | No (managed) | No |
-| Works on macOS/Windows | No | **Yes** | Yes | Yes |
-| Works in CI | No | **Yes** | Yes | Yes |
-| Isolation level | KVM (hardware) | cgroups + namespaces | Firecracker | cgroups + namespaces |
-| Boot time | **~28ms** | <1s | ~500ms | ~1s |
-| Pricing | **Free** | **Free** | $0.000075/sec | Free |
-| Pool mode (N users / 1 VM) | **Yes** | **Yes** | No | No |
-| Python + TypeScript SDKs | **Yes** | **Yes** | Yes | No |
-| Data privacy | Your machine | Your machine | Their cloud | Your machine |
-| REST API + WebSocket | **Yes** | **Yes** | Yes | No |
-| E2B drop-in replacement | **Yes** | **Yes** | — | No |
-
-### The math
-
-Running 10 sandboxes, 8 hours/day, 30 days:
-
-| | Cost |
-|--|--|
-| **E2B** | 10 × 8h × 30d × $0.27/h ≈ **$648/month** |
-| **ForgeVM pool mode** | 10 users → 2 containers → **$0** |
-
----
-
-## Two providers, one API
-
-ForgeVM ships two execution backends. Same REST API, same SDKs, same config format — swap with one line.
-
-### Firecracker — production, hardware isolation
-
-Real KVM microVMs. Each sandbox gets its own kernel, rootfs, and network namespace. AI-generated code cannot escape to the host — even a kernel exploit only affects that sandbox's guest kernel.
-
-**First spawn:** cold boot ~1s + snapshot creation
-**Every spawn after:** restore from snapshot **~28ms**
-
-```yaml
-# forgevm.yaml
-providers:
-  default: "firecracker"
-  firecracker:
-    enabled: true
-```
-
-Requires: Linux + KVM. Run `curl ... | bash` on any bare-metal or nested-virt cloud VM.
-
-### Docker — everywhere, no KVM
-
-OCI containers as sandboxes. Works on macOS, Windows (Docker Desktop), Linux, and every CI provider. Same pool mode, same file API, same SDKs.
-
-```yaml
-# forgevm.yaml
-providers:
-  default: "docker"
-  docker:
-    enabled: true
-    default_image: "python:3.12-slim"
-    network_mode: "none"      # air-gapped by default
-    read_only_rootfs: false
-    memory: "512m"
-    cpus: "1"
-    dropped_caps: ["ALL"]     # drop all capabilities
-```
-
-Isolation is cgroup + namespace based (same as Docker), not hypervisor-level. Use for development, CI, and workloads where full VM isolation isn't required.
-
----
-
-## Give your LLM a computer
-
-Define one tool. Point it at ForgeVM. Done.
 
 ```python
-import anthropic, requests
-
-FORGEVM = "http://localhost:7423/api/v1"
-sb = requests.post(f"{FORGEVM}/sandboxes", json={"image": "python:3.12"}).json()
-
-tools = [{
-    "name": "computer",
-    "description": "Execute Python code or shell commands in a sandboxed environment.",
-    "input_schema": {
-        "type": "object",
-        "properties": {
-            "code": {"type": "string", "description": "Code to run (Python or shell)"},
-            "lang": {"type": "string", "enum": ["python", "shell"], "default": "python"}
-        },
-        "required": ["code"]
-    }
-}]
-
-def run_tool(input):
-    cmd = f"python3 -c {input['code']!r}" if input.get("lang") != "shell" else input["code"]
-    r = requests.post(f"{FORGEVM}/sandboxes/{sb['id']}/exec", json={"command": cmd})
-    return r.json()
-
-client = anthropic.Anthropic()
-messages = [{"role": "user", "content": "Analyze the first 1000 prime numbers and plot their distribution"}]
-
-while True:
-    response = client.messages.create(model="claude-opus-4-5", max_tokens=4096, tools=tools, messages=messages)
-    messages.append({"role": "assistant", "content": response.content})
-
-    if response.stop_reason == "tool_use":
-        results = []
-        for block in response.content:
-            if block.type == "tool_use":
-                output = run_tool(block.input)
-                results.append({"type": "tool_result", "tool_use_id": block.id, "content": str(output)})
-        messages.append({"role": "user", "content": results})
-    else:
-        print(next(b.text for b in response.content if hasattr(b, "text")))
-        break
-
-requests.delete(f"{FORGEVM}/sandboxes/{sb['id']}")
-```
-
-Works with OpenAI, Anthropic, or any model that supports tool/function calling. Each conversation gets its own sandbox. Destroy it when the conversation ends.
-
----
-
-## Multi-user pool mode
-
-One VM. Many users. Each isolated in their own workspace directory.
-
-```
-                    ┌─────────────────────────────┐
-   User A ──────────► /workspace/sb-a1b2c3d4/     │
-   User B ──────────► /workspace/sb-b9e8f7c6/     │  VM-1 (2GB RAM, 2 vCPU)
-   User C ──────────► /workspace/sb-c3d4e5f6/     │
-                    └─────────────────────────────┘
-                    ┌─────────────────────────────┐
-   User D ──────────► /workspace/sb-d1e2f3a4/     │
-   User E ──────────► /workspace/sb-e5f6a7b8/     │  VM-2 (2GB RAM, 2 vCPU)
-                    └─────────────────────────────┘
-
-   10 users. 2 VMs. Directory-level isolation. Files are invisible across users.
-```
-
-```yaml
-# forgevm.yaml
-pool:
-  enabled: true
-  max_vms: 10
-  max_users_per_vm: 5
-  image: "python:3.12"
-  memory_mb: 2048
-  vcpus: 2
-  overflow: "reject"   # or "queue"
-```
-
-```bash
-curl -s localhost:7423/api/v1/pool/status | jq
-# { "total_vms": 2, "active_users": 5, "available_slots": 5 }
-```
-
-Works with both Firecracker and Docker providers. With Firecracker, VMs are pre-warmed from snapshots — users get assigned in ~28ms. With Docker, containers spin up in under a second.
-
----
-
-## Python SDK
-
-```bash
 pip install forgevm
 ```
 
@@ -217,226 +56,184 @@ pip install forgevm
 from forgevm import Client
 
 client = Client("http://localhost:7423")
+sandbox = client.spawn(image="python:3.12")
 
-# Lifecycle
-sb = client.spawn(image="python:3.12", memory_mb=1024, vcpus=1)
-result = sb.exec("python3 -c 'print(\"hello\")'")
-print(result.stdout)   # hello
+result = sandbox.exec('print("hello from my own computer")')
+print(result.stdout)  # hello from my own computer
 
-# Files
-sb.write_file("/app/main.py", 'print("built with ForgeVM")')
-sb.exec("python3 /app/main.py")
-content = sb.read_file("/app/main.py")
-files   = sb.list_files("/app")
-sb.move_file("/app/main.py", "/app/app.py")
-sb.chmod_file("/app/app.py", "755")
-info    = sb.stat_file("/app/app.py")
-matches = sb.glob_files("/app/*.py")
-sb.delete_file("/app/app.py")
-
-# Streaming
-for chunk in sb.exec_stream("for i in $(seq 5); do echo line $i; sleep 0.1; done"):
-    print(chunk.data, end="", flush=True)
-
-# TTL + cleanup
-sb.extend_ttl("30m")
-sb.destroy()
+sandbox.destroy()  # gone. forever.
 ```
 
-**Context manager** — auto-destroys:
-
-```python
-with client.spawn(image="python:3.12") as sb:
-    sb.exec("pip install httpx -q")
-    result = sb.exec("python3 -c 'import httpx; print(httpx.get(\"https://httpbin.org/ip\").text)'")
-    print(result.stdout)
-# sandbox destroyed automatically
-```
-
-**Async:**
-
-```python
-from forgevm import AsyncClient
-import asyncio
-
-async def main():
-    async with AsyncClient("http://localhost:7423") as client:
-        sb = await client.spawn(image="python:3.12")
-        result = await sb.exec("python3 -c 'print(42)'")
-        await sb.destroy()
-
-asyncio.run(main())
-```
+7 lines. Your AI agent now has a real, isolated machine it can use and throw away.
 
 ---
 
-## TypeScript SDK
+## Why ForgeVM?
 
-```bash
-npm install forgevm
+You're building an AI agent. It generates code. That code needs to run somewhere safe.
+
+**The problem:**
+
+- **Docker** shares the host kernel. One container escape and your machine is owned. Multiple [runc CVEs in 2024-2025](https://github.com/opencontainers/runc/security/advisories) proved this isn't theoretical.
+- **Cloud sandboxes** (E2B, Modal) send your code and data to someone else's servers. Adds latency, costs money, and you lose control of your data.
+- **Daytona** is self-hostable but needs [12 services](https://www.daytona.io/docs/en/oss-deployment) (PostgreSQL, Redis, MinIO, Dex, registry...) just to get started.
+
+**ForgeVM is one binary.** Self-hosted. Boots a sandbox in ~28ms. Your data never leaves your machine. And you choose the isolation level — Docker containers for dev, gVisor for cloud VMs, Firecracker microVMs for maximum hardware-level security.
+
+| | ForgeVM | E2B | Daytona | Modal | Raw Docker |
+|---|:---:|:---:|:---:|:---:|:---:|
+| Self-hosted | ✅ | ❌ Cloud only | ✅ (12 services) | ❌ Cloud only | ✅ |
+| Isolation levels | KVM + gVisor + Docker | Container | Container | Container | Shared kernel |
+| Cold boot | **~28ms** (snapshot) | ~500ms | Seconds | Seconds | ~200ms |
+| Single binary deploy | ✅ | ❌ | ❌ | ❌ | N/A |
+| Multi-user pool mode | ✅ | ❌ | ❌ | ❌ | ❌ |
+| Runs without KVM | ✅ Docker provider | N/A | ✅ | N/A | ✅ |
+| Your data stays local | ✅ | ❌ | ✅ | ❌ | ✅ |
+| License | MIT | Partial | Apache 2.0 | Proprietary | N/A |
+
+### The math
+
+E2B charges per second. Default sandbox = 2 vCPU + 512 MiB RAM:
+
 ```
+2 vCPU:    $0.000028/s
+512 MiB:   $0.0000045/GiB/s × 0.5 GiB = $0.00000225/s
+─────────────────────────────────────────
+Total:     $0.00003025/s = $0.109/hour per sandbox
+```
+
+| Concurrent sandboxes | E2B / month | ForgeVM pool mode |
+|---|---|---|
+| 10 | $261 compute + $150 plan = **$411** | **$0** |
+| 50 | $1,307 compute + $150 plan = **$1,457** | **$0** |
+| 100 | $2,614 compute + $150 plan = **$2,764** | **$0** |
+
+_Assumes 8h/day active. ForgeVM pool mode: 5 users per VM, your own infra._
+
+---
+
+## Pick your isolation level
+
+ForgeVM has a **provider interface**. One config change swaps the entire backend. Your application code doesn't change.
+
+```yaml
+# forgevm.yaml — change one line
+providers:
+  default: "docker"  # or "firecracker" or "mock"
+  docker:
+    runtime: "runc"  # or "runsc" (gVisor) or "kata-runtime"
+```
+
+| Provider | What it does | KVM? | Boot | Use when |
+|---|---|:---:|---|---|
+| **Firecracker** | Real microVM. Own kernel, rootfs, network. ~28ms via snapshot restore. | Yes | ~28ms | Production. Maximum isolation. |
+| **Docker** (runc) | OCI container with seccomp, cap_drop ALL, read-only rootfs, no network. | No | ~200ms | Dev, CI/CD, Mac, Windows. |
+| **Docker** (gVisor) | Same as above, but syscalls hit a user-space kernel instead of host. | No | ~400ms | Cloud VMs. Stronger than containers. |
+| **Docker** (Kata) | Lightweight VM per container. Hardware isolation without Firecracker setup. | Yes | ~1s | Kubernetes (AKS/GKE). |
+| **Mock** | Temp directories on host. Zero overhead. | No | Instant | Testing, development. |
+
+Every provider implements the same 16-method interface. SDKs, API, CLI, pool mode — all work identically regardless of backend.
+
+---
+
+## Pool mode — the feature nobody else has
+
+Traditional sandbox tools: 1 user = 1 VM. 100 users = 100 VMs = massive bill.
+
+ForgeVM pool mode: **1 VM serves N users.** Each gets an isolated `/workspace/{id}/`. Path traversal blocked. Optional per-user UID + PID namespace hardening.
+
+```yaml
+pool:
+  enabled: true
+  max_vms: 20
+  max_users_per_vm: 5
+  image: "python:3.12-slim"
+  memory_mb: 2048
+```
+
+**100 users → 20 VMs instead of 100. 60% less infrastructure. Same isolation guarantees.**
+
+Pool mode works with every provider — Docker containers, Firecracker microVMs, gVisor, Kata. The orchestrator handles user-to-VM assignment, workspace scoping, and cleanup automatically.
+
+---
+
+## SDKs
+
+<table>
+<tr>
+<td width="50%"><b>Python</b></td>
+<td width="50%"><b>TypeScript</b></td>
+</tr>
+<tr>
+<td>
+
+```python
+from forgevm import Client
+
+client = Client("http://localhost:7423")
+
+# Context manager — auto-destroys on exit
+with client.spawn(image="python:3.12") as sb:
+    sb.exec("pip install pandas")
+    sb.write_file("/app/analyze.py", code)
+    result = sb.exec("python3 /app/analyze.py")
+    print(result.stdout)
+
+# Async support
+from forgevm import AsyncClient
+async with AsyncClient(url) as client:
+    sb = await client.spawn()
+    result = await sb.exec("whoami")
+```
+
+</td>
+<td>
 
 ```typescript
 import { Client } from "forgevm";
 
 const client = new Client("http://localhost:7423");
-const sb = await client.spawn({ image: "node:22" });
+const sb = await client.spawn({ image: "node:20" });
 
-const result = await sb.exec("node -e 'console.log(process.version)'");
+// Files + exec
+await sb.writeFile("/app/index.js", code);
+const result = await sb.exec("node /app/index.js");
 console.log(result.stdout);
 
-// Files
-await sb.writeFile("/app/index.js", 'console.log("hello from ForgeVM")');
-await sb.exec("node /app/index.js");
-const content = await sb.readFile("/app/index.js");
-const files   = await sb.listFiles("/app");
-await sb.moveFile("/app/index.js", "/app/app.js");
-await sb.chmodFile("/app/app.js", "755");
-const info    = await sb.statFile("/app/app.js");
-const matches = await sb.globFiles("/app/*.js");
-await sb.deleteFile("/app/app.js");
-
-// Streaming
-for await (const chunk of sb.execStream("ping -c 3 localhost")) {
+// Stream output in real-time
+for await (const chunk of sb.execStream("npm test")) {
   process.stdout.write(chunk.data);
 }
 
-await sb.extendTtl("30m");
 await sb.destroy();
 ```
 
----
-
-## Install
-
-### Pre-built binaries (recommended)
+</td>
+</tr>
+</table>
 
 ```bash
-curl -fsSL https://raw.githubusercontent.com/DohaerisAI/forgevm/main/scripts/install.sh | bash
-```
-
-Downloads `forgevm` + `forgevm-agent`, installs Firecracker, downloads the Linux kernel. No Go required. KVM access is needed for Firecracker — if your machine doesn't have KVM, use the Docker provider instead.
-
-### Build from source
-
-```bash
-git clone https://github.com/DohaerisAI/forgevm && cd forgevm
-./scripts/setup.sh
-```
-
-Requires Go 1.25+, Docker (for image builds), and KVM. Sets up XFS reflink for the fastest possible snapshot restores.
-
-### Docker only (no KVM, no Firecracker)
-
-If you just want Docker provider (macOS, Windows, CI):
-
-```bash
-curl -fsSL .../install.sh | bash   # installs forgevm binary only
-forgevm serve                       # starts with Docker provider
+pip install forgevm    # Python
+npm install forgevm    # TypeScript
 ```
 
 ---
 
-## Configuration
+## Security defaults
 
-```yaml
-# forgevm.yaml — all defaults shown
+Every sandbox ships locked down. You opt *in* to less restriction, not out.
 
-server:
-  host: "0.0.0.0"
-  port: 7423
+| Layer | Default | What it does |
+|---|---|---|
+| Capabilities | `cap_drop: ALL` | Can't mount, ptrace, load modules, change networking |
+| Syscalls | Seccomp default profile | Blocks ~44 dangerous syscalls |
+| Filesystem | Read-only rootfs | Only `/tmp` and `/workspace` writable (tmpfs, size-capped) |
+| Network | `mode: none` | Zero outbound access. Can't phone home or exfiltrate. |
+| Processes | PID limit: 256 | Fork bombs die immediately |
+| User | Non-root (uid 1000) | No root inside the sandbox |
+| Lifetime | TTL auto-expiry | Forgotten sandboxes clean themselves up |
 
-providers:
-  default: "firecracker"    # "firecracker" | "docker" | "mock" | "e2b" | "custom"
-
-  firecracker:
-    enabled: true
-    firecracker_path: "/usr/local/bin/firecracker"
-    kernel_path:      "/var/lib/forgevm/vmlinux.bin"
-    agent_path:       "./bin/forgevm-agent"
-    data_dir:         "/var/lib/forgevm"
-
-  docker:
-    enabled: false
-    socket:          "unix:///var/run/docker.sock"
-    runtime:         "runc"            # "runc" | "runsc" (gVisor) | "kata-runtime"
-    default_image:   "alpine:latest"
-    network_mode:    "none"
-    read_only_rootfs: true
-    memory:          "512m"
-    cpus:            "1"
-    pids_limit:      256
-    dropped_caps:    ["ALL"]
-
-defaults:
-  ttl:         "30m"
-  image:       "alpine:latest"
-  memory_mb:   1024
-  vcpus:       1
-
-pool:
-  enabled:         false
-  max_vms:         10
-  max_users_per_vm: 5
-  image:           "python:3.12"
-  memory_mb:       2048
-  vcpus:           2
-  overflow:        "reject"   # "reject" | "queue"
-
-auth:
-  enabled: false
-  api_key: ""
-
-logging:
-  level:  "info"
-  format: "json"   # "json" | "pretty"
-```
-
-Config priority: `./forgevm.yaml` → `~/.forgevm/config.yaml` → env vars (`FORGEVM_SERVER_PORT=8080`)
-
----
-
-## REST API
-
-`http://localhost:7423/api/v1`
-
-### Sandboxes
-
-| Method | Endpoint | Description |
-|--------|----------|-------------|
-| `POST` | `/sandboxes` | Spawn a sandbox |
-| `GET` | `/sandboxes` | List all sandboxes |
-| `DELETE` | `/sandboxes` | Prune expired |
-| `GET` | `/sandboxes/:id` | Get sandbox |
-| `DELETE` | `/sandboxes/:id` | Destroy |
-| `POST` | `/sandboxes/:id/extend` | Extend TTL |
-| `POST` | `/sandboxes/:id/exec` | Execute command |
-| `GET` | `/sandboxes/:id/exec/ws` | Execute via WebSocket |
-| `POST` | `/sandboxes/:id/files` | Write file |
-| `GET` | `/sandboxes/:id/files` | Read file |
-| `DELETE` | `/sandboxes/:id/files` | Delete file |
-| `GET` | `/sandboxes/:id/files/list` | List directory |
-| `POST` | `/sandboxes/:id/files/move` | Move / rename |
-| `POST` | `/sandboxes/:id/files/chmod` | Change permissions |
-| `GET` | `/sandboxes/:id/files/stat` | File info |
-| `GET` | `/sandboxes/:id/files/glob` | Glob pattern |
-| `GET` | `/sandboxes/:id/logs` | Console output |
-
-### Templates · Providers · Environments · System
-
-| Method | Endpoint | Description |
-|--------|----------|-------------|
-| `POST/GET` | `/templates` | Sandbox templates |
-| `POST` | `/templates/:name/spawn` | Spawn from template |
-| `GET` | `/providers` | List registered providers |
-| `POST` | `/providers/test` | Health-check a provider |
-| `POST/GET` | `/environments/specs` | Environment specs |
-| `POST/GET` | `/environments/builds` | Image builds |
-| `POST` | `/environments/registry-connections` | Registry credentials |
-| `GET` | `/health` | Health check |
-| `GET` | `/metrics` | Runtime metrics |
-| `GET` | `/events` | SSE event stream |
-| `GET` | `/pool/status` | Pool status |
+With the Firecracker provider, you also get: dedicated kernel per sandbox, vsock-only communication (no TCP between host and guest), and ephemeral rootfs destroyed on teardown.
 
 ---
 
@@ -444,73 +241,153 @@ Config priority: `./forgevm.yaml` → `~/.forgevm/config.yaml` → env vars (`FO
 
 ![ForgeVM Architecture](assets/forgevm_architecture_diagram.svg)
 
----
+**Key flow:** SDK → REST API → Orchestrator (lifecycle, TTL, pool, templates) → Provider → Sandbox
 
-## Security
-
-### Firecracker: hardware-level isolation
-
-Each sandbox runs its own Linux kernel inside a KVM virtual machine. AI-generated code that exploits a kernel vulnerability only compromises that sandbox's kernel — the host is untouched. The guest agent communicates with the host over `virtio-vsock` only. No network exposure, no shared kernel.
-
-- Each sandbox = dedicated kernel + ephemeral rootfs
-- vsock only — zero host network exposure
-- Auto-TTL — sandbox destroyed after timeout
-- Optional API key authentication
-
-### Docker: defense-in-depth
-
-Docker sandboxes use `cap_drop: ALL`, `network_mode: none`, `read_only_rootfs`, PID limits, and seccomp profiles by default. Not hardware-isolated like Firecracker, but appropriate for trusted workloads, development, and CI environments.
-
-Switching runtimes is one config line:
-
-```yaml
-docker:
-  runtime: "runsc"       # gVisor — syscall interception, stronger isolation
-  # runtime: "kata-runtime"  # Kata containers — VM-backed OCI
-```
-
-### When to use which
-
-| Workload | Provider |
-|----------|----------|
-| Untrusted user code in production | Firecracker |
-| Internal tooling, developer sandboxes | Docker |
-| macOS / Windows / CI | Docker (only option without KVM) |
-| Maximum throughput on Linux servers | Firecracker (snapshot restore) |
+**Snapshot trick:** First Firecracker spawn cold-boots (~1s) and snapshots the VM state. Every spawn after that restores from snapshot in **~28ms** — faster than most HTTP requests.
 
 ---
 
 ## CLI
 
 ```bash
-forgevm serve                              # start server
-forgevm spawn --image python:3.12 --ttl 1h # spawn interactively
-forgevm list                               # list all sandboxes
-forgevm exec sb-a1b2c3d4 -- echo hello    # run a command
-forgevm kill sb-a1b2c3d4                  # destroy
-forgevm build-image python:3.12           # prebake Docker image → Firecracker rootfs
-forgevm tui                               # interactive dashboard
-forgevm version                           # print version
+forgevm serve                                  # start server
+forgevm spawn --image python:3.12 --ttl 1h     # spawn
+forgevm exec sb-a1b2c3d4 -- python3 app.py     # run code
+forgevm list                                    # list active sandboxes
+forgevm kill sb-a1b2c3d4                        # destroy
+forgevm build-image python:3.12                 # pre-build rootfs
+forgevm tui                                     # interactive dashboard
 ```
 
 ---
 
-## Development
+## REST API
+
+Base URL: `http://localhost:7423/api/v1`
+
+| Method | Endpoint | Description |
+|---|---|---|
+| `POST` | `/sandboxes` | Spawn a sandbox |
+| `GET` | `/sandboxes` | List all sandboxes |
+| `GET` | `/sandboxes/:id` | Get sandbox details |
+| `DELETE` | `/sandboxes/:id` | Destroy sandbox |
+| `POST` | `/sandboxes/:id/exec` | Execute a command |
+| `GET` | `/sandboxes/:id/exec/ws` | Execute via WebSocket |
+| `POST` | `/sandboxes/:id/files` | Write a file |
+| `GET` | `/sandboxes/:id/files?path=` | Read a file |
+| `GET` | `/sandboxes/:id/files/list` | List files |
+| `POST` | `/sandboxes/:id/extend` | Extend TTL |
+| `GET` | `/sandboxes/:id/logs` | Console logs |
+| `GET` | `/health` | Health check |
+| `GET` | `/events` | SSE event stream |
+| `POST` | `/templates` | Create template |
+| `POST` | `/templates/:name/spawn` | Spawn from template |
+
+Full API docs: [docs/api.md](docs/api.md)
+
+---
+
+## Configuration
+
+```yaml
+# forgevm.yaml (optional — sane defaults without it)
+server:
+  host: "0.0.0.0"
+  port: 7423
+
+providers:
+  default: "docker"
+  docker:
+    enabled: true
+    runtime: "runc"
+    network_mode: "none"
+    read_only_rootfs: true
+  firecracker:
+    enabled: true
+    kernel_path: "/var/lib/forgevm/vmlinux.bin"
+
+defaults:
+  ttl: "30m"
+  image: "alpine:latest"
+  memory_mb: 512
+
+auth:
+  enabled: false
+  api_key: "your-secret-key"
+```
+
+Config priority: `./forgevm.yaml` > `~/.forgevm/config.yaml` > env vars (`FORGEVM_SERVER_PORT=8080`)
+
+---
+
+## Web Dashboard
+
+Built-in React dashboard for sandbox management, live terminal, file browser, and log viewer.
 
 ```bash
-make build          # build server binary
-make build-agent    # build guest agent (static linux/amd64)
-make build-all      # build both
-make test           # go test ./...
-make web            # build React dashboard
-make lint           # go vet
-make release-build  # static binaries + checksums.txt
+make web          # build frontend
+./forgevm serve   # open http://localhost:7423
 ```
+
+---
+
+## Install options
+
+**One-command setup (recommended):**
+```bash
+git clone https://github.com/DohaerisAI/forgevm && cd forgevm
+./scripts/setup.sh    # checks Go, Docker, KVM, downloads Firecracker + kernel, builds everything
+./forgevm serve
+```
+
+**Build from source:**
+```bash
+make build-all
+sudo mkdir -p /var/lib/forgevm && sudo chown $(whoami) /var/lib/forgevm
+./scripts/setup-kernel.sh
+```
+
+**Docker:**
+```bash
+docker build -t forgevm .
+docker run -p 7423:7423 forgevm
+```
+
+**Binary download** (when releases are available):
+```bash
+curl -fsSL https://github.com/DohaerisAI/forgevm/releases/latest/download/forgevm-linux-amd64 -o forgevm
+chmod +x forgevm && sudo mv forgevm /usr/local/bin/
+```
+
+---
+
+## Roadmap
+
+- [x] Firecracker provider (KVM microVMs, ~28ms snapshot restore)
+- [x] Docker provider (OCI containers, seccomp, no KVM needed)
+- [x] gVisor support (user-space kernel via runsc runtime)
+- [x] Pool mode (N users per VM, workspace isolation)
+- [x] Python SDK + TypeScript SDK
+- [x] Web dashboard + TUI
+- [x] Template system + warm pools
+- [ ] Kata Containers provider (K8s-native)
+- [ ] Persistent volumes across sandboxes
+- [ ] MCP server mode
+- [ ] GPU passthrough
+
+---
 
 ## Contributing
 
-[CONTRIBUTING.md](CONTRIBUTING.md)
+See [CONTRIBUTING.md](CONTRIBUTING.md). PRs welcome — especially for new providers, SDK improvements, and documentation.
 
 ## License
 
-[MIT](LICENSE)
+[MIT](LICENSE) — use it however you want.
+
+---
+
+<p align="center">
+  <b>Built by <a href="https://github.com/DohaerisAI">DohaerisAI</a></b><br>
+  If ForgeVM helps you, drop a ⭐ — it helps others find it.
+</p>
