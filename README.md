@@ -77,19 +77,27 @@ You're building an AI agent. It generates code. That code needs to run somewhere
 - **Docker** shares the host kernel. One container escape and your machine is owned. Multiple [runc CVEs in 2024-2025](https://github.com/opencontainers/runc/security/advisories) proved this isn't theoretical.
 - **Cloud sandboxes** (E2B, Modal) send your code and data to someone else's servers. Adds latency, costs money, and you lose control of your data.
 - **Daytona** is self-hostable but needs [12 services](https://www.daytona.io/docs/en/oss-deployment) (PostgreSQL, Redis, MinIO, Dex, registry...) just to get started.
+- **Zeroboot** is blazing fast (~0.8ms) but strips everything — no networking, no filesystem, no multi-vCPU, serial-only I/O. Built for "run a function, get a result."
 
 **ForgeVM is one binary.** Self-hosted. Boots a sandbox in ~28ms. Your data never leaves your machine. And you choose the isolation level — Docker containers for dev, gVisor for cloud VMs, Firecracker microVMs for maximum hardware-level security.
 
-| | ForgeVM | E2B | Daytona | Modal | Raw Docker |
-|---|:---:|:---:|:---:|:---:|:---:|
-| Self-hosted | ✅ | ❌ Cloud only | ✅ (12 services) | ❌ Cloud only | ✅ |
-| Isolation levels | KVM + gVisor + Docker | Container | Container | Container | Shared kernel |
-| Cold boot | **~28ms** (snapshot) | ~500ms | Seconds | Seconds | ~200ms |
-| Single binary deploy | ✅ | ❌ | ❌ | ❌ | N/A |
-| Multi-user pool mode | ✅ | ❌ | ❌ | ❌ | ❌ |
-| Runs without KVM | ✅ Docker provider | N/A | ✅ | N/A | ✅ |
-| Your data stays local | ✅ | ❌ | ✅ | ❌ | ✅ |
-| License | MIT | Partial | Apache 2.0 | Proprietary | N/A |
+| | ForgeVM | E2B | Zeroboot | Daytona | Modal | Raw Docker |
+|---|:---:|:---:|:---:|:---:|:---:|:---:|
+| Self-hosted | ✅ | ❌ Cloud only | ✅ | ✅ (12 services) | ❌ Cloud only | ✅ |
+| Isolation | KVM + gVisor + Docker | Container | KVM only | Container | Container | Shared kernel |
+| Cold boot | **~28ms** (snapshot) | ~500ms | **~0.8ms** (CoW fork) | Seconds | Seconds | ~200ms |
+| Networking | ✅ | ✅ | ❌ Serial only | ✅ | ✅ | ✅ |
+| Filesystem / disk I/O | ✅ | ✅ | ❌ Memory only | ✅ | ✅ | ✅ |
+| Multi-vCPU | ✅ | ✅ | ❌ Single vCPU | ✅ | ✅ | ✅ |
+| Multiple providers | ✅ KVM/Docker/gVisor | ❌ | ❌ KVM only | ❌ | ❌ | N/A |
+| Runs without KVM | ✅ Docker provider | N/A | ❌ | ✅ | N/A | ✅ |
+| Multi-user pool mode | ✅ | ❌ | ❌ | ❌ | ❌ | ❌ |
+| File API (read/write/glob) | ✅ 16 methods | ✅ | ❌ | ❌ | ❌ | ❌ |
+| Python + TS SDKs | ✅ | ✅ | ✅ | ❌ | ✅ | ❌ |
+| Your data stays local | ✅ | ❌ | ✅ | ✅ | ❌ | ✅ |
+| License | MIT | Partial | Apache 2.0 | Apache 2.0 | Proprietary | N/A |
+
+> **On speed:** Zeroboot's 0.8ms is real — they bypass Firecracker's VMM entirely and `mmap(MAP_PRIVATE)` the snapshot memory as copy-on-write. But there's no disk, no network, and I/O is serial UART only. ForgeVM's 28ms gives you a full sandbox with networking, file system, virtio, and multi-vCPU. Different tools for different jobs.
 
 ### The math
 
