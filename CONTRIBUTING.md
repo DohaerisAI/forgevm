@@ -39,6 +39,7 @@ cmd/forgevm-agent/    Guest agent (runs inside microVMs)
 internal/             All server-side logic
 sdk/python/           Python SDK
 sdk/js/               TypeScript SDK
+sdk/kotlin/           Kotlin SDK
 web/                  React frontend
 tui/                  Terminal dashboard
 ```

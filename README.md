@@ -243,6 +243,31 @@ await sandbox.destroy();
 
 ---
 
+## Use with Kotlin / Android
+
+```kotlin
+import ai.dohaeris.forgevm.Client
+import kotlinx.coroutines.runBlocking
+
+fun main() = runBlocking {
+    val client = Client("http://localhost:7423")
+
+    val sandbox = client.spawn(image = "alpine:latest")
+    val result = sandbox.exec("echo hello world")
+    println(result.stdout)
+
+    sandbox.writeFile("/app/main.sh", "echo from ForgeVM\n")
+    sandbox.exec("sh /app/main.sh")
+
+    sandbox.extendTtl("30m")
+    sandbox.destroy()
+}
+```
+
+The Kotlin SDK lives in [`sdk/kotlin`](./sdk/kotlin) and is intended for JVM and Android apps.
+
+---
+
 ## CLI
 
 ```bash

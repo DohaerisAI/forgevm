@@ -61,3 +61,7 @@ htmlcov/
 
 # Claude Code
 .claude/
+.codex/
+
+# Gradle
+.gradle/
