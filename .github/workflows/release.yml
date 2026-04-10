@@ -45,8 +45,20 @@ jobs:
           go build -ldflags="-s -w"
           -o forgevm-agent-linux-amd64 ./cmd/forgevm-agent
 
+      - name: Build forgevm (arm64)
+        run: >
+          CGO_ENABLED=0 GOOS=linux GOARCH=arm64
+          go build -ldflags="-s -w -X main.version=${{ github.ref_name }}"
+          -o forgevm-linux-arm64 ./cmd/forgevm
+
+      - name: Build forgevm-agent (arm64)
+        run: >
+          CGO_ENABLED=0 GOOS=linux GOARCH=arm64
+          go build -ldflags="-s -w"
+          -o forgevm-agent-linux-arm64 ./cmd/forgevm-agent
+
       - name: Generate checksums
-        run: sha256sum forgevm-linux-amd64 forgevm-agent-linux-amd64 > checksums.txt
+        run: sha256sum forgevm-linux-amd64 forgevm-agent-linux-amd64 forgevm-linux-arm64 forgevm-agent-linux-arm64 > checksums.txt
 
       - name: Create GitHub Release
         uses: softprops/action-gh-release@v2
@@ -56,4 +68,6 @@ jobs:
           files: |
             forgevm-linux-amd64
             forgevm-agent-linux-amd64
+            forgevm-linux-arm64
+            forgevm-agent-linux-arm64
             checksums.txt

@@ -46,6 +46,19 @@ type ProvidersConfig struct {
 	Docker      DockerConfig      `mapstructure:"docker"`
 	E2B         E2BConfig         `mapstructure:"e2b"`
 	Custom      CustomConfig      `mapstructure:"custom"`
+	PRoot       PRootConfig       `mapstructure:"proot"`
+}
+
+type PRootConfig struct {
+	Enabled        bool     `mapstructure:"enabled"`
+	RootfsPath     string   `mapstructure:"rootfs_path"`
+	PRootBinary    string   `mapstructure:"proot_binary"`
+	WorkspaceBase  string   `mapstructure:"workspace_base"`
+	DefaultTimeout string   `mapstructure:"default_timeout"`
+	MaxSandboxes   int      `mapstructure:"max_sandboxes"`
+	MaxMemoryMB    int      `mapstructure:"max_memory_mb"`
+	MaxDiskMB      int      `mapstructure:"max_disk_mb"`
+	Languages      []string `mapstructure:"languages"`
 }
 
 type DockerConfig struct {
@@ -162,6 +175,16 @@ func setDefaults(v *viper.Viper) {
 	v.SetDefault("providers.docker.pool_security.pid_namespace", false)
 	v.SetDefault("providers.docker.pool_security.workspace_permissions", true)
 	v.SetDefault("providers.docker.pool_security.hidepid", false)
+
+	v.SetDefault("providers.proot.enabled", false)
+	v.SetDefault("providers.proot.proot_binary", "proot")
+	v.SetDefault("providers.proot.rootfs_path", "/var/lib/forgevm/rootfs")
+	v.SetDefault("providers.proot.workspace_base", "/var/lib/forgevm/workspaces")
+	v.SetDefault("providers.proot.default_timeout", "60s")
+	v.SetDefault("providers.proot.max_sandboxes", 10)
+	v.SetDefault("providers.proot.max_memory_mb", 512)
+	v.SetDefault("providers.proot.max_disk_mb", 1024)
+	v.SetDefault("providers.proot.languages", []string{"python3", "node", "bash"})
 
 	v.SetDefault("defaults.ttl", "30m")
 	v.SetDefault("defaults.image", "alpine:latest")

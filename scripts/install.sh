@@ -37,9 +37,12 @@ if [[ "$(uname -s)" != "Linux" ]]; then
 fi
 
 ARCH=$(uname -m)
-if [[ "$ARCH" != "x86_64" ]]; then
-    fail "ForgeVM requires x86_64. You're on $ARCH."
-fi
+case "$ARCH" in
+    x86_64)  ARCH_SUFFIX="amd64" ;;
+    aarch64|arm64) ARCH_SUFFIX="arm64" ;;
+    *) fail "ForgeVM supports x86_64 and aarch64. You're on $ARCH." ;;
+esac
+info "Detected architecture: $ARCH ($ARCH_SUFFIX)"
 
 # ── Detect version ───────────────────────────────────────
 if [[ -n "${FORGEVM_VERSION:-}" ]]; then
@@ -60,9 +63,9 @@ RELEASE_URL="https://github.com/${REPO}/releases/download/${VERSION}"
 TMPDIR=$(mktemp -d)
 trap 'rm -rf "$TMPDIR"' EXIT
 
-info "Downloading forgevm ${VERSION}..."
-curl -fSL -o "$TMPDIR/forgevm" "${RELEASE_URL}/forgevm-linux-amd64"
-curl -fSL -o "$TMPDIR/forgevm-agent" "${RELEASE_URL}/forgevm-agent-linux-amd64"
+info "Downloading forgevm ${VERSION} (${ARCH_SUFFIX})..."
+curl -fSL -o "$TMPDIR/forgevm" "${RELEASE_URL}/forgevm-linux-${ARCH_SUFFIX}"
+curl -fSL -o "$TMPDIR/forgevm-agent" "${RELEASE_URL}/forgevm-agent-linux-${ARCH_SUFFIX}"
 curl -fSL -o "$TMPDIR/checksums.txt" "${RELEASE_URL}/checksums.txt"
 
 # ── Verify checksums ────────────────────────────────────
@@ -71,8 +74,8 @@ cd "$TMPDIR"
 # checksums.txt has names like forgevm-linux-amd64, rename for verification
 sha256sum -c checksums.txt --ignore-missing 2>/dev/null || {
     # Try manual verification with renamed files
-    EXPECTED_VM=$(grep "forgevm-linux-amd64" checksums.txt | awk '{print $1}')
-    EXPECTED_AGENT=$(grep "forgevm-agent-linux-amd64" checksums.txt | awk '{print $1}')
+    EXPECTED_VM=$(grep "forgevm-linux-${ARCH_SUFFIX}" checksums.txt | grep -v agent | awk '{print $1}')
+    EXPECTED_AGENT=$(grep "forgevm-agent-linux-${ARCH_SUFFIX}" checksums.txt | awk '{print $1}')
     ACTUAL_VM=$(sha256sum forgevm | awk '{print $1}')
     ACTUAL_AGENT=$(sha256sum forgevm-agent | awk '{print $1}')
 
@@ -103,6 +106,10 @@ info "Installed forgevm and forgevm-agent to ${INSTALL_DIR}"
 if command -v firecracker &>/dev/null; then
     FC_VER=$(firecracker --version 2>&1 | head -1)
     info "Firecracker already installed: $FC_VER"
+elif [[ "$ARCH_SUFFIX" == "arm64" ]]; then
+    warn "Firecracker auto-install not supported on ARM64."
+    warn "On ARM64, consider using the PRoot or Docker provider instead."
+    warn "Set FORGEVM_PROVIDERS_DEFAULT=proot or FORGEVM_PROVIDERS_DEFAULT=docker"
 else
     warn "Firecracker not found. Installing latest release..."
     FC_VERSION=$(curl -fsSL https://api.github.com/repos/firecracker-microvm/firecracker/releases/latest | grep '"tag_name"' | cut -d'"' -f4)
@@ -133,7 +140,9 @@ if [[ ! -d "$DATA_DIR" ]]; then
     sudo chown "$(whoami)" "$DATA_DIR"
 fi
 
-if [[ -f "$DATA_DIR/vmlinux.bin" ]]; then
+if [[ "$ARCH_SUFFIX" == "arm64" ]]; then
+    info "Skipping kernel download on ARM64 (Firecracker kernel not needed for PRoot/Docker)"
+elif [[ -f "$DATA_DIR/vmlinux.bin" ]]; then
     info "Kernel already exists at $DATA_DIR/vmlinux.bin"
 else
     info "Downloading Firecracker kernel..."
