@@ -124,6 +124,38 @@ func runServe() error {
 				Msg("docker provider registered")
 		}
 	}
+	if cfg.Providers.PRoot.Enabled {
+		timeout, _ := time.ParseDuration(cfg.Providers.PRoot.DefaultTimeout)
+		if timeout == 0 {
+			timeout = 60 * time.Second
+		}
+		proot := providers.NewPRootProvider(providers.PRootProviderConfig{
+			RootfsPath:     cfg.Providers.PRoot.RootfsPath,
+			PRootBinary:    cfg.Providers.PRoot.PRootBinary,
+			WorkspaceBase:  cfg.Providers.PRoot.WorkspaceBase,
+			DefaultTimeout: timeout,
+			MaxSandboxes:   cfg.Providers.PRoot.MaxSandboxes,
+			MaxMemoryMB:    cfg.Providers.PRoot.MaxMemoryMB,
+			MaxDiskMB:      cfg.Providers.PRoot.MaxDiskMB,
+			Languages:      cfg.Providers.PRoot.Languages,
+		}, logger)
+		registry.Register(proot)
+		logger.Info().
+			Str("rootfs", cfg.Providers.PRoot.RootfsPath).
+			Str("binary", cfg.Providers.PRoot.PRootBinary).
+			Msg("proot provider registered")
+	}
+
+	// Auto-detect provider if set to "auto"
+	if cfg.Providers.Default == "auto" {
+		env := config.DetectEnvironment()
+		cfg.Providers.Default = config.DefaultProviderForEnv(env)
+		logger.Info().
+			Str("environment", env.String()).
+			Str("provider", cfg.Providers.Default).
+			Msg("auto-detected default provider")
+	}
+
 	if err := registry.SetDefault(cfg.Providers.Default); err != nil {
 		logger.Warn().Err(err).Msg("setting default provider")
 	}

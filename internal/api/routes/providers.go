@@ -135,6 +135,12 @@ func (p *ProviderRoutes) Detail(w http.ResponseWriter, r *http.Request) {
 		cfg["type"] = "firecracker"
 	case *providers.MockProvider:
 		cfg["type"] = "mock"
+	case *providers.PRootProvider:
+		c := v.ProviderConfig()
+		cfg["rootfs_path"] = c.RootfsPath
+		cfg["proot_binary"] = c.PRootBinary
+		cfg["workspace_base"] = c.WorkspaceBase
+		cfg["type"] = "proot"
 	default:
 		cfg["type"] = "other"
 	}
